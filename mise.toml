@@ -1,0 +1,13 @@
+[tools]
+flutter = { version = "3.22", platforms = """
+[linux-arm64]
+url = 'https://storage.googleapis.com/flutter_infra_release/releases/stable/linux/flutter_linux_arm64_{{ version | replace(from="-stable", to="") }}-stable.tar.xz'
+
+[linux-x64]
+url = 'https://storage.googleapis.com/flutter_infra_release/releases/stable/linux/flutter_linux_{{ version | replace(from="-stable", to="") }}-stable.tar.xz'
+""", url = "https://storage.googleapis.com/flutter_infra_release/releases/stable/macos/flutter_macos_arm64_{{ version }}-stable.zip", version_expr = 'body.releases | filter(attribute="channel", value="stable") | map(attribute="version") | sortVersions()', version_list_url = "https://storage.googleapis.com/flutter_infra_release/releases/releases_linux.json" }
+rust = "1.93"
+
+
+[tasks.setup_flutter_android]
+run = 'flutter config --jdk-dir=$JAVA_HOME'
