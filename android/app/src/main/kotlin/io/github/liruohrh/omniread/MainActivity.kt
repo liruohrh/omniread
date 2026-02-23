@@ -1,4 +1,4 @@
-package com.example.omniread
+package io.github.liruohrh.omniread
 
 import io.flutter.embedding.android.FlutterActivity
 
