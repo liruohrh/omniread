@@ -1,16 +1,19 @@
 # omniread
 
-A new Flutter project.
+友好地阅读漫画、小说、视频等物品。
 
-## Getting Started
+存储：支持本地、云（网盘、webdav）、app 之间同步。
 
-This project is a starting point for a Flutter application.
+导入导出：epub、...。
 
-A few resources to get you started if this is your first Flutter project:
+备份。
 
-- [Lab: Write your first Flutter app](https://docs.flutter.dev/get-started/codelab)
-- [Cookbook: Useful Flutter samples](https://docs.flutter.dev/cookbook)
 
-For help getting started with Flutter development, view the
-[online documentation](https://docs.flutter.dev/), which offers tutorials,
-samples, guidance on mobile development, and a full API reference.
+## 内容解析规则
+
+- 针对网站配置 主域URL、搜索 URL、分类 URL、以及内容（如标题）的 css（或者 js） 等规则。
+
+## 内容净化
+
+- 文本净化：如将某些乱码用正则匹配删除
+- 图片净化：AI 画质增强、AI 配色
