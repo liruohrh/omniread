@@ -1,6 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:omniread/main.dart';
-import 'package:omniread/src/rust/frb_generated.dart';
+import 'package:omniread/gen/rust/frb_generated.dart';
 import 'package:integration_test/integration_test.dart';
 
 void main() {
