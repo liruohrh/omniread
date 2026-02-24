@@ -4,7 +4,7 @@ import 'dart:collection';
 import 'headless_renderer.dart';
 
 /// Signature for a render function: takes (url, jsCode), returns rendered HTML.
-/// Used to decouple [RenderPool] from [HeadlessRenderer] for testability.
+/// Used to decouple [RenderPool] from [HtmlRenderer] for testability.
 typedef RenderFn = Future<String> Function(String url, String jsCode);
 
 /// A render task handle returned by [RenderPool.submit].
@@ -14,7 +14,7 @@ class RenderTask {
   final String jsCode;
   final Completer<String> _completer = Completer<String>();
 
-  HeadlessRenderer? _renderer;
+  HtmlRenderer? _renderer;
   bool _isCancelled = false;
 
   RenderTask(this.url, this.jsCode);
@@ -43,7 +43,7 @@ class RenderTask {
   }
 }
 
-/// Concurrent render pool that manages multiple [HeadlessRenderer] instances
+/// Concurrent render pool that manages multiple [HtmlRenderer] instances
 /// with a configurable concurrency limit.
 ///
 /// ## Usage Scenarios
@@ -80,7 +80,7 @@ class RenderPool {
   /// Creates a RenderPool.
   ///
   /// [maxConcurrent]: max number of concurrent render tasks.
-  /// [renderFn]: optional custom render function. If null, uses [HeadlessRenderer].
+  /// [renderFn]: optional custom render function. If null, uses [HtmlRenderer].
   ///   Inject a mock here for unit testing without a real device.
   RenderPool({required int maxConcurrent, RenderFn? renderFn})
       : _maxConcurrent = maxConcurrent,
@@ -157,10 +157,10 @@ class RenderPool {
   }
 
   void _executeWithRenderer(RenderTask task) {
-    final renderer = HeadlessRenderer();
+    final renderer = HtmlRenderer(task.url, task.jsCode);
     task._renderer = renderer;
 
-    renderer.render(task.url, task.jsCode).then((html) {
+    renderer.render().then((html) {
       if (!task._completer.isCompleted) {
         task._completer.complete(html);
       }

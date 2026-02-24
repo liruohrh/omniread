@@ -7,31 +7,29 @@ import 'helper.dart';
 void main() {
   IntegrationTestWidgetsFlutterBinding.ensureInitialized();
 
-  group('HeadlessRenderer', () {
+  group('HtmlRenderer', () {
     test('renders a simple page and returns HTML', () async {
-      final renderer = HeadlessRenderer();
-      final html = await renderer.render('https://example.com', '');
+      final renderer = HtmlRenderer('https://example.com', '');
+      final html = await renderer.render();
       expect(html, contains('<html'));
       expect(html, contains('Example Domain'));
     });
 
     test('executes JS wait code before capturing HTML', () async {
-      final renderer = HeadlessRenderer();
-      final html = await renderer.render(
+      final renderer = HtmlRenderer(
         'https://example.com',
         'await new Promise(r => setTimeout(r, 500));',
       );
+      final html = await renderer.render();
       expect(html, contains('<html'));
     });
 
     test('cancel stops a running render', () async {
-      final renderer = HeadlessRenderer();
-      final future = renderer
-          .render(
+      final renderer = HtmlRenderer(
         'https://example.com',
         'await new Promise(r => setTimeout(r, 30000));', // hang for 30s
-      )
-          .catchError((e) {
+      );
+      final future = renderer.render().catchError((e) {
         expect(e is RenderCancelledException, isTrue);
         return ""; // 返回一个默认值，让 future 正常完成
       });
@@ -42,21 +40,45 @@ void main() {
     });
 
     test('JS syntax error throws RenderJsException', () async {
-      final renderer = HeadlessRenderer();
-      final future = renderer.render(
+      final renderer = HtmlRenderer(
         'https://example.com',
         'this is not valid javascript !!!{{{',
       );
+      final future = renderer.render();
       expect(future, throwsandLogA<RenderJsException>());
     });
 
     test('JS runtime exception throws RenderJsException', () async {
-      final renderer = HeadlessRenderer();
-      final future = renderer.render(
+      final renderer = HtmlRenderer(
         'https://example.com',
         'throw new Error("intentional test error");',
       );
+      final future = renderer.render();
       expect(future, throwsandLogA<RenderJsException>());
+    });
+
+    test('render after cancelled throws RenderAlreadyCancelledException',
+        () async {
+      final renderer = HtmlRenderer(
+        'https://example.com',
+        'await new Promise(r => setTimeout(r, 1000));',
+      );
+      renderer.cancel();
+      expect(
+          renderer.render(), throwsA(isA<RenderAlreadyCancelledException>()));
+    });
+
+    test('double render throws RenderAlreadyRunningException', () async {
+      final renderer = HtmlRenderer(
+        'https://example.com',
+        'await new Promise(r => setTimeout(r, 30000));',
+      );
+      // Start first render (don't await)
+      renderer.render().catchError((_) => '');
+      await Future.delayed(const Duration(milliseconds: 100));
+      // Second render should throw
+      expect(renderer.render(), throwsA(isA<RenderAlreadyRunningException>()));
+      renderer.cancel();
     });
   });
 }

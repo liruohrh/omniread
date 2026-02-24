@@ -17,7 +17,7 @@ class _HeadlessRenderTestPageState extends State<HeadlessRenderTestPage> {
   );
   final _timeoutController = TextEditingController(text: '30');
 
-  HeadlessRenderer? _renderer;
+  HtmlRenderer? _renderer;
   bool _isRendering = false;
   String _status = 'Idle';
   String _result = '';
@@ -62,13 +62,13 @@ await new Promise((resolve) => {
       _result = '';
     });
 
-    _renderer = HeadlessRenderer();
+    _renderer = HtmlRenderer(url, jsCode);
 
     try {
-      // Directly call Dart HeadlessRenderer (no Rust layer).
+      // Directly call Dart HtmlRenderer (no Rust layer).
       // Timeout is managed here (Flutter-side).
       // Both user-exit (dispose -> cancel) and timeout use the same cancel() mechanism.
-      final html = await _renderer!.render(url, jsCode).timeout(
+      final html = await _renderer!.render().timeout(
         Duration(seconds: timeoutSec),
         onTimeout: () {
           _renderer?.cancel();

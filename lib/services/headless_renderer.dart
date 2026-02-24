@@ -4,8 +4,15 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_inappwebview/flutter_inappwebview.dart';
 
+/// Base interface for all render-related exceptions.
+/// Users can catch [RenderException] to handle all render errors uniformly.
+abstract class RenderException implements Exception {
+  String get url;
+}
+
 /// Thrown when a render operation is cancelled.
-class RenderCancelledException implements Exception {
+class RenderCancelledException implements RenderException {
+  @override
   final String url;
   const RenderCancelledException(this.url);
 
@@ -14,7 +21,8 @@ class RenderCancelledException implements Exception {
 }
 
 /// Thrown when a page fails to load (network error, DNS failure, etc.).
-class RenderLoadException implements Exception {
+class RenderLoadException implements RenderException {
+  @override
   final String url;
   final String message;
   const RenderLoadException(this.url, this.message);
@@ -24,7 +32,8 @@ class RenderLoadException implements Exception {
 }
 
 /// Thrown when the server responds with an HTTP error status code.
-class RenderHttpException implements Exception {
+class RenderHttpException implements RenderException {
+  @override
   final String url;
   final int statusCode;
   final String? reasonPhrase;
@@ -36,7 +45,8 @@ class RenderHttpException implements Exception {
 }
 
 /// Thrown when JavaScript execution fails.
-class RenderJsException implements Exception {
+class RenderJsException implements RenderException {
+  @override
   final String url;
   final Object cause;
   final String message;
@@ -46,22 +56,42 @@ class RenderJsException implements Exception {
       'RenderJsException(${message.isNotEmpty ? "$message, " : ""}$url): $cause';
 }
 
+/// Thrown when attempting to render on an already cancelled renderer.
+class RenderAlreadyCancelledException implements RenderException {
+  @override
+  final String url;
+  const RenderAlreadyCancelledException(this.url);
+
+  @override
+  String toString() => 'RenderAlreadyCancelledException: $url';
+}
+
+/// Thrown when attempting to render multiple times on the same renderer.
+class RenderAlreadyRunningException implements RenderException {
+  @override
+  final String url;
+  const RenderAlreadyRunningException(this.url);
+
+  @override
+  String toString() => 'RenderAlreadyRunningException: $url';
+}
+
 /// Renders a URL in a headless (invisible) system WebView, executes JavaScript
 /// to wait for elements/conditions, then captures and returns the rendered HTML.
 ///
-/// ## Cancel/Timeout Design
-/// Cancel and timeout are managed by the **caller**, not by this class.
-/// Both user-exit and timeout use the same unified mechanism:
-///   - User exits: caller calls `cancel()` in widget's `dispose()`
-///   - Timeout:    caller uses `Future.timeout()` then calls `cancel()`
-/// This keeps the renderer focused on rendering, and the caller controls lifecycle.
+/// ## Usage
+/// Each `HtmlRenderer` instance is bound to a single URL and jsCode.
+/// Create a new instance for each render task.
 ///
 /// Example usage:
 /// ```dart
-/// final renderer = HeadlessRenderer();
+/// final renderer = HtmlRenderer(
+///   'https://example.com',
+///   'await new Promise(r => setTimeout(r, 1000))',
+/// );
 /// try {
 ///   final html = await renderer
-///       .render('https://example.com', 'await new Promise(r => setTimeout(r, 1000))')
+///       .render()
 ///       .timeout(Duration(seconds: 30), onTimeout: () {
 ///     renderer.cancel();
 ///     throw TimeoutException('Render timed out');
@@ -70,15 +100,28 @@ class RenderJsException implements Exception {
 ///   renderer.cancel(); // ensure cleanup
 /// }
 /// ```
-class HeadlessRenderer {
+class HtmlRenderer {
+  final String url;
+  final String jsCode;
+
   HeadlessInAppWebView? _webView;
   Completer<String>? _completer;
   bool _isCancelled = false;
   bool _isDisposing = false;
-  String _currentUrl = '';
+  bool _hasRendered = false;
+
+  /// Creates a renderer for the given [url] and [jsCode].
+  /// Each instance can only be used once.
+  HtmlRenderer(this.url, this.jsCode);
 
   /// Whether a render task is currently running.
   bool get isRendering => _completer != null && !_completer!.isCompleted;
+
+  /// Whether this renderer has been cancelled.
+  bool get isCancelled => _isCancelled;
+
+  /// Whether this renderer has already completed a render.
+  bool get hasRendered => _hasRendered;
 
   /// Render [url] in a headless WebView, execute [jsCode] after page loads,
   /// then return the fully rendered HTML (document.documentElement.outerHTML).
@@ -86,15 +129,25 @@ class HeadlessRenderer {
   /// [jsCode] is executed via `callAsyncJavaScript` so async/await is supported.
   /// It has no return value — it just waits for elements/conditions to appear.
   /// After [jsCode] completes, the full page HTML is captured and returned.
-  Future<String> render(String url, String jsCode) async {
-    if (isRendering) {
-      throw StateError(
-          'A render task is already running. Call cancel() first.');
+  ///
+  /// Throws [RenderAlreadyCancelledException] if this renderer has been cancelled.
+  /// Throws [RenderAlreadyRunningException] if render is already in progress.
+  /// Throws [StateError] if render has already completed.
+  Future<String> render() async {
+    if (_isCancelled) {
+      throw RenderAlreadyCancelledException(url);
     }
 
-    _isCancelled = false;
-    _isDisposing = false; // Reset for new render
-    _currentUrl = url;
+    if (isRendering) {
+      throw RenderAlreadyRunningException(url);
+    }
+
+    if (_hasRendered) {
+      throw StateError(
+          'Render has already completed. Create a new HtmlRenderer instance.');
+    }
+
+    _isDisposing = false;
     _completer = Completer<String>();
 
     _webView = HeadlessInAppWebView(
@@ -103,7 +156,7 @@ class HeadlessRenderer {
         if (_isCancelled) return;
 
         try {
-          debugPrint('HeadlessRenderer: loaded $url');
+          debugPrint('HtmlRenderer: loaded $url');
           if (jsCode.isNotEmpty) {
             if (_isCancelled) return;
 
@@ -137,6 +190,7 @@ class HeadlessRenderer {
           );
 
           if (!_completer!.isCompleted) {
+            _hasRendered = true;
             _completer!.complete(html is String ? html : html.toString());
           }
         } catch (e) {
@@ -154,14 +208,14 @@ class HeadlessRenderer {
       },
       onReceivedHttpError: (controller, request, response) {
         final requestUrl = request.url.toString();
-        if (requestUrl == _currentUrl && !_completer!.isCompleted) {
+        if (requestUrl == url && !_completer!.isCompleted) {
           _completer!.completeError(
             RenderHttpException(
                 url, response.statusCode ?? 0, response.reasonPhrase),
           );
         } else {
           debugPrint(
-              'HeadlessRenderer: HTTP error for $requestUrl, status=${response.statusCode}');
+              'HtmlRenderer: HTTP error for $requestUrl, status=${response.statusCode}');
         }
       },
     );
@@ -182,10 +236,11 @@ class HeadlessRenderer {
   /// - Timeout:    Future.timeout(duration) -> cancel()
   ///
   /// Safe to call multiple times or when no task is running.
+  /// Once cancelled, this renderer cannot be used again.
   void cancel() {
     _isCancelled = true;
     if (_completer != null && !_completer!.isCompleted) {
-      _completer!.completeError(RenderCancelledException(_currentUrl));
+      _completer!.completeError(RenderCancelledException(url));
     }
     _dispose();
   }
