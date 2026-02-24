@@ -137,13 +137,17 @@ class HeadlessRenderer {
         _dispose();
       },
       onReceivedHttpError: (controller, request, response) {
-        if (!_completer!.isCompleted) {
+        final requestUrl = request.url.toString();
+        if (requestUrl == _currentUrl && !_completer!.isCompleted) {
           _completer!.completeError(
             RenderHttpException(
                 url, response.statusCode ?? 0, response.reasonPhrase),
           );
+          _dispose();
+        } else {
+          print(
+              'HeadlessRenderer: HTTP error for $requestUrl, status=${response.statusCode}');
         }
-        _dispose();
       },
     );
 
