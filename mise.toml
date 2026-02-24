@@ -11,3 +11,6 @@ rust = "1.93"
 
 [tasks.setup_flutter_android]
 run = 'flutter config --jdk-dir=$JAVA_HOME'
+
+[tasks.watch_frb]
+run = 'flutter_rust_bridge_codegen generate --watch'
