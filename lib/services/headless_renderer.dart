@@ -2,6 +2,47 @@ import 'dart:async';
 
 import 'package:flutter_inappwebview/flutter_inappwebview.dart';
 
+/// Thrown when a render operation is cancelled.
+class RenderCancelledException implements Exception {
+  final String url;
+  const RenderCancelledException(this.url);
+
+  @override
+  String toString() => 'RenderCancelledException: $url';
+}
+
+/// Thrown when a page fails to load (network error, DNS failure, etc.).
+class RenderLoadException implements Exception {
+  final String url;
+  final String message;
+  const RenderLoadException(this.url, this.message);
+
+  @override
+  String toString() => 'RenderLoadException($url): $message';
+}
+
+/// Thrown when the server responds with an HTTP error status code.
+class RenderHttpException implements Exception {
+  final String url;
+  final int statusCode;
+  final String? reasonPhrase;
+  const RenderHttpException(this.url, this.statusCode, this.reasonPhrase);
+
+  @override
+  String toString() =>
+      'RenderHttpException($url): $statusCode ${reasonPhrase ?? ''}';
+}
+
+/// Thrown when JavaScript execution fails.
+class RenderJsException implements Exception {
+  final String url;
+  final Object cause;
+  const RenderJsException(this.url, this.cause);
+
+  @override
+  String toString() => 'RenderJsException($url): $cause';
+}
+
 /// Renders a URL in a headless (invisible) system WebView, executes JavaScript
 /// to wait for elements/conditions, then captures and returns the rendered HTML.
 ///
@@ -30,6 +71,7 @@ class HeadlessRenderer {
   HeadlessInAppWebView? _webView;
   Completer<String>? _completer;
   bool _isCancelled = false;
+  String _currentUrl = '';
 
   /// Whether a render task is currently running.
   bool get isRendering => _completer != null && !_completer!.isCompleted;
@@ -47,6 +89,7 @@ class HeadlessRenderer {
     }
 
     _isCancelled = false;
+    _currentUrl = url;
     _completer = Completer<String>();
 
     _webView = HeadlessInAppWebView(
@@ -55,11 +98,16 @@ class HeadlessRenderer {
         if (_isCancelled) return;
 
         try {
+          print('HeadlessRenderer: loaded $url');
           // Execute the JS wait condition. callAsyncJavaScript supports async/await.
           // The JS code has no return value — it just waits for rendering to complete.
           if (jsCode.isNotEmpty) {
             if (_isCancelled) return;
-            await controller.callAsyncJavaScript(functionBody: jsCode);
+            final jsResult =
+                await controller.callAsyncJavaScript(functionBody: jsCode);
+            if (jsResult?.error != null) {
+              throw jsResult!.error!;
+            }
           }
 
           if (_isCancelled) return;
@@ -74,7 +122,7 @@ class HeadlessRenderer {
           }
         } catch (e) {
           if (!_completer!.isCompleted) {
-            _completer!.completeError(e);
+            _completer!.completeError(RenderJsException(url, e));
           }
         } finally {
           _dispose();
@@ -83,8 +131,7 @@ class HeadlessRenderer {
       onReceivedError: (controller, request, error) {
         if (!_completer!.isCompleted) {
           _completer!.completeError(
-            Exception(
-                'Page load error (${error.type}): ${error.description} [url=${request.url}]'),
+            RenderLoadException(url, '${error.type}: ${error.description}'),
           );
         }
         _dispose();
@@ -92,8 +139,8 @@ class HeadlessRenderer {
       onReceivedHttpError: (controller, request, response) {
         if (!_completer!.isCompleted) {
           _completer!.completeError(
-            Exception(
-                'HTTP error (${response.statusCode}): ${response.reasonPhrase} [url=${request.url}]'),
+            RenderHttpException(
+                url, response.statusCode ?? 0, response.reasonPhrase),
           );
         }
         _dispose();
@@ -114,7 +161,7 @@ class HeadlessRenderer {
   void cancel() {
     _isCancelled = true;
     if (_completer != null && !_completer!.isCompleted) {
-      _completer!.completeError(Exception('Rendering cancelled'));
+      _completer!.completeError(RenderCancelledException(_currentUrl));
     }
     _dispose();
   }
