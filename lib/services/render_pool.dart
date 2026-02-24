@@ -3,6 +3,10 @@ import 'dart:collection';
 
 import 'headless_renderer.dart';
 
+/// Signature for a render function: takes (url, jsCode), returns rendered HTML.
+/// Used to decouple [RenderPool] from [HeadlessRenderer] for testability.
+typedef RenderFn = Future<String> Function(String url, String jsCode);
+
 /// A render task handle returned by [RenderPool.submit].
 /// Use [cancel] to cancel this specific task (whether queued or running).
 class RenderTask {
@@ -26,15 +30,15 @@ class RenderTask {
   bool get isPending => !_completer.isCompleted;
 
   /// Cancel this task.
-  /// - If queued (not yet started): removed from queue, completes with error.
-  /// - If running: disposes the WebView, completes with error.
+  /// - If queued (not yet started): completes with [RenderCancelledException].
+  /// - If running: disposes the WebView, completes with [RenderCancelledException].
   /// - If already completed: no-op.
   void cancel() {
     if (_isCancelled || _completer.isCompleted) return;
     _isCancelled = true;
     _renderer?.cancel();
     if (!_completer.isCompleted) {
-      _completer.completeError(Exception('Render task cancelled'));
+      _completer.completeError(RenderCancelledException(url));
     }
   }
 }
@@ -71,8 +75,16 @@ class RenderPool {
   final _queue = Queue<RenderTask>();
   final _activeTasks = <RenderTask>{};
   bool _disposed = false;
+  final RenderFn? _renderFn;
 
-  RenderPool({required int maxConcurrent}) : _maxConcurrent = maxConcurrent;
+  /// Creates a RenderPool.
+  ///
+  /// [maxConcurrent]: max number of concurrent render tasks.
+  /// [renderFn]: optional custom render function. If null, uses [HeadlessRenderer].
+  ///   Inject a mock here for unit testing without a real device.
+  RenderPool({required int maxConcurrent, RenderFn? renderFn})
+      : _maxConcurrent = maxConcurrent,
+        _renderFn = renderFn;
 
   /// Current max concurrency. Can be changed at runtime via [maxConcurrent=].
   int get maxConcurrent => _maxConcurrent;
@@ -107,13 +119,11 @@ class RenderPool {
 
   /// Cancel all queued and running tasks.
   void cancelAll() {
-    // Cancel queued tasks
     for (final task in _queue) {
       task.cancel();
     }
     _queue.clear();
 
-    // Cancel running tasks
     for (final task in _activeTasks.toList()) {
       task.cancel();
     }
@@ -139,6 +149,14 @@ class RenderPool {
   }
 
   void _execute(RenderTask task) {
+    if (_renderFn != null) {
+      _executeWithFn(task);
+    } else {
+      _executeWithRenderer(task);
+    }
+  }
+
+  void _executeWithRenderer(RenderTask task) {
     final renderer = HeadlessRenderer();
     task._renderer = renderer;
 
@@ -152,6 +170,22 @@ class RenderPool {
       }
     }).whenComplete(() {
       task._renderer = null;
+      _activeTasks.remove(task);
+      _running--;
+      _tryNext();
+    });
+  }
+
+  void _executeWithFn(RenderTask task) {
+    _renderFn!(task.url, task.jsCode).then((html) {
+      if (!task._completer.isCompleted) {
+        task._completer.complete(html);
+      }
+    }).catchError((Object e) {
+      if (!task._completer.isCompleted) {
+        task._completer.completeError(e);
+      }
+    }).whenComplete(() {
       _activeTasks.remove(task);
       _running--;
       _tryNext();
