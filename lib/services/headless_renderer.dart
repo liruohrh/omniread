@@ -1,5 +1,7 @@
 import 'dart:async';
 
+import 'package:flutter/foundation.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter_inappwebview/flutter_inappwebview.dart';
 
 /// Thrown when a render operation is cancelled.
@@ -37,10 +39,11 @@ class RenderHttpException implements Exception {
 class RenderJsException implements Exception {
   final String url;
   final Object cause;
-  const RenderJsException(this.url, this.cause);
-
+  final String message;
+  const RenderJsException(this.url, this.cause, {this.message = ""});
   @override
-  String toString() => 'RenderJsException($url): $cause';
+  String toString() =>
+      'RenderJsException(${message.isNotEmpty ? "$message, " : ""}$url): $cause';
 }
 
 /// Renders a URL in a headless (invisible) system WebView, executes JavaScript
@@ -71,6 +74,7 @@ class HeadlessRenderer {
   HeadlessInAppWebView? _webView;
   Completer<String>? _completer;
   bool _isCancelled = false;
+  bool _isDisposing = false;
   String _currentUrl = '';
 
   /// Whether a render task is currently running.
@@ -89,6 +93,7 @@ class HeadlessRenderer {
     }
 
     _isCancelled = false;
+    _isDisposing = false; // Reset for new render
     _currentUrl = url;
     _completer = Completer<String>();
 
@@ -98,13 +103,27 @@ class HeadlessRenderer {
         if (_isCancelled) return;
 
         try {
-          print('HeadlessRenderer: loaded $url');
-          // Execute the JS wait condition. callAsyncJavaScript supports async/await.
-          // The JS code has no return value — it just waits for rendering to complete.
+          debugPrint('HeadlessRenderer: loaded $url');
           if (jsCode.isNotEmpty) {
             if (_isCancelled) return;
-            final jsResult =
-                await controller.callAsyncJavaScript(functionBody: jsCode);
+
+            // check js syntax
+            //  for webview do not throw error for invalid syntax
+            //. ensure platforms: android
+            try {
+              final jsResult = await controller.callAsyncJavaScript(
+                  functionBody: "new Function(jsCode);",
+                  arguments: {"jsCode": "async ()=>{ $jsCode }"});
+              if (jsResult?.error != null) {
+                throw jsResult!.error!;
+              }
+            } catch (e) {
+              throw RenderJsException(url, e, message: "check js syntax");
+            }
+            // invoke
+            final jsResult = await controller.callAsyncJavaScript(
+              functionBody: jsCode,
+            );
             if (jsResult?.error != null) {
               throw jsResult!.error!;
             }
@@ -124,8 +143,6 @@ class HeadlessRenderer {
           if (!_completer!.isCompleted) {
             _completer!.completeError(RenderJsException(url, e));
           }
-        } finally {
-          _dispose();
         }
       },
       onReceivedError: (controller, request, error) {
@@ -134,7 +151,6 @@ class HeadlessRenderer {
             RenderLoadException(url, '${error.type}: ${error.description}'),
           );
         }
-        _dispose();
       },
       onReceivedHttpError: (controller, request, response) {
         final requestUrl = request.url.toString();
@@ -143,16 +159,20 @@ class HeadlessRenderer {
             RenderHttpException(
                 url, response.statusCode ?? 0, response.reasonPhrase),
           );
-          _dispose();
         } else {
-          print(
+          debugPrint(
               'HeadlessRenderer: HTTP error for $requestUrl, status=${response.statusCode}');
         }
       },
     );
 
-    await _webView!.run();
-    return _completer!.future;
+    try {
+      await _webView!.run();
+      final result = await _completer!.future;
+      return result;
+    } finally {
+      _dispose();
+    }
   }
 
   /// Cancel the current render task.
@@ -171,7 +191,15 @@ class HeadlessRenderer {
   }
 
   void _dispose() {
-    _webView?.dispose();
-    _webView = null;
+    if (_isDisposing || _webView == null) return;
+    _isDisposing = true;
+    Future.delayed(const Duration(milliseconds: 500), () {
+      try {
+        _webView?.dispose();
+      } finally {
+        _isDisposing = false;
+        _webView = null;
+      }
+    });
   }
 }
