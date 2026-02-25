@@ -102,6 +102,7 @@ class RenderAlreadyRunningException implements RenderException {
 /// ```
 class HtmlRenderer {
   final String url;
+  // 仅用来阻塞的异步代码
   final String jsCode;
 
   HeadlessInAppWebView? _webView;
@@ -109,6 +110,7 @@ class HtmlRenderer {
   bool _isCancelled = false;
   bool _isDisposing = false;
   bool _hasRendered = false;
+  String? invalidJSLog;
 
   /// Creates a renderer for the given [url] and [jsCode].
   /// Each instance can only be used once.
@@ -152,6 +154,12 @@ class HtmlRenderer {
 
     _webView = HeadlessInAppWebView(
       initialUrlRequest: URLRequest(url: WebUri(url)),
+      onConsoleMessage: (controller, consoleMessage) {
+        if (consoleMessage.messageLevel == ConsoleMessageLevel.ERROR &&
+            consoleMessage.message.startsWith("Uncaught SyntaxError: ")) {
+          invalidJSLog = consoleMessage.message;
+        }
+      },
       onLoadStop: (controller, loadedUrl) async {
         if (_isCancelled) return;
 
@@ -162,14 +170,41 @@ class HtmlRenderer {
 
             // check js syntax
             //  for webview do not throw error for invalid syntax
-            //. ensure platforms: android
+            //  no throw: android
+            //  throw error: ios、macos
+            String checkJSSource = """
+(async()=>{
+  $jsCode
+}) ? "1" : "0";
+""";
+            debugPrint('HtmlRenderer: js syntax check: \n$checkJSSource');
             try {
-              final jsResult = await controller.callAsyncJavaScript(
-                  functionBody: "new Function(jsCode);",
-                  arguments: {"jsCode": "async ()=>{ $jsCode }"});
-              if (jsResult?.error != null) {
-                throw jsResult!.error!;
+              final res =
+                  await controller.evaluateJavascript(source: checkJSSource);
+              if (res == null) {
+                if (invalidJSLog == null) {
+                  await Future.delayed(const Duration(milliseconds: 500));
+                }
+                if (invalidJSLog == null) {
+                  await Future.delayed(const Duration(milliseconds: 500));
+                }
+                if (invalidJSLog == null) {
+                  debugPrint(
+                      'HtmlRenderer: js syntax check: invalid: result null and wait invalidJSLog set 3th');
+                  await Future.delayed(const Duration(milliseconds: 1000));
+                }
+                debugPrint(
+                    'HtmlRenderer: js syntax check: invalid: result null and invalidJSLog=`${invalidJSLog!}`');
+                throw RenderJsException(
+                  url,
+                  "result null and invalidJSLog=`${invalidJSLog!}`",
+                  message: "check js syntax",
+                );
               }
+              debugPrint(
+                  'HtmlRenderer: js syntax check result: ${res is String ? "\"$res\"" : res}');
+            } on RenderJsException catch (_) {
+              rethrow;
             } catch (e) {
               throw RenderJsException(url, e, message: "check js syntax");
             }
@@ -195,7 +230,11 @@ class HtmlRenderer {
           }
         } catch (e) {
           if (!_completer!.isCompleted) {
-            _completer!.completeError(RenderJsException(url, e));
+            Object err = e;
+            if (err is! RenderJsException) {
+              err = RenderJsException(url, e);
+            }
+            _completer!.completeError(err);
           }
         }
       },
