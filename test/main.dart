@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:omniread/gen/rust/frb_generated.dart';
 import 'headless_render_test.dart';
 import 'pool_render_test.dart';
+import 'webview_simple_test.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -38,6 +39,11 @@ class TestHomePage extends StatelessWidget {
             title: 'WebView',
             icon: Icons.web,
             items: [
+              _TestItem(
+                title: 'Simple WebView',
+                subtitle: '原始 flutter_inappwebview 有头/无头测试',
+                builder: (context) => const WebViewSimpleTestPage(),
+              ),
               _TestItem(
                 title: 'Single Render',
                 subtitle: '单次 HeadlessWebView 渲染测试',
