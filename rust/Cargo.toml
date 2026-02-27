@@ -4,10 +4,26 @@ version = "0.1.0"
 edition = "2021"
 
 [lib]
-crate-type = ["cdylib", "staticlib"]
+crate-type = ["cdylib", "staticlib", "lib"]
 
 [dependencies]
 flutter_rust_bridge = "=2.11.1"
+scraper = "0.21"
+boa_engine = "0.20"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+regex = "1.12.3"
+hex = "0.4.3"
+base64 = "0.22.1"
+md-5 = "0.10.6"
+sha2 = "0.10.9"
+
+[dev-dependencies]
+criterion = "0.5"
+
+[[bench]]
+name = "js_runtime_bench"
+harness = false
 
 [lints.rust]
 unexpected_cfgs = { level = "warn", check-cfg = ['cfg(frb_expand)'] }
