@@ -20,6 +20,12 @@ hex = "0.4.3"
 base64 = "0.22.1"
 md-5 = "0.10.6"
 sha2 = "0.10.9"
+rusqlite = { version = "0.31.0", features = ["chrono"] }
+chrono = { version = "0.4.31", features = ["serde"] }
+reqwest = { version = "0.12.0", features = ["cookies", "json"] }
+cookie_store = "0.22.1"
+url = "2.5.0"
+thiserror = "1.0.50"
 
 [dev-dependencies]
 criterion = "0.5"
