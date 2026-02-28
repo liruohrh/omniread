@@ -63,7 +63,9 @@ mod tests {
         };
         manager.create_cookie(cookie1).unwrap();
 
-        let cookies = manager.get_cookies_for_url("https://example.com/path").unwrap();
+        let cookies = manager
+            .get_cookies_for_url("https://example.com/path")
+            .unwrap();
         assert_eq!(cookies.len(), 1);
         assert_eq!(cookies[0].name, "a");
     }

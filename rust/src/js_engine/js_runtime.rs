@@ -10,8 +10,12 @@ use scraper::{Html, Node, Selector};
 use sha2::Sha256;
 use std::cell::RefCell;
 use std::collections::HashMap;
+use std::sync::Arc;
+use tokio::runtime::Runtime;
 
 use super::context::ParseContext;
+use crate::http_client::HttpClient;
+use crate::request_config::{RequestConfig, RequestMethod};
 
 thread_local! {
     static CURRENT_HTML: RefCell<Option<Html>> = RefCell::new(None);
@@ -21,6 +25,8 @@ thread_local! {
     static WEBVIEW_REQUEST: RefCell<Option<WebViewRequest>> = RefCell::new(None);
     /// Next page URL for multi-page content
     static NEXT_PAGE_URL: RefCell<Option<String>> = RefCell::new(None);
+    /// HTTP client for JS API
+    static HTTP_CLIENT: RefCell<Option<Arc<HttpClient>>> = RefCell::new(None);
 }
 
 /// WebView request from JS
@@ -29,6 +35,88 @@ pub struct WebViewRequest {
     pub url: String,
     pub js: Option<String>,
     pub wait_for: Option<String>,
+}
+
+/// HTTP response for JS
+#[derive(Debug, Clone)]
+pub struct JsHttpResponse {
+    pub status: u16,
+    pub body: String,
+    pub headers: HashMap<String, String>,
+}
+
+fn block_on<F: std::future::Future>(future: F) -> F::Output {
+    match tokio::runtime::Handle::try_current() {
+        Ok(_) => {
+            let runtime = Runtime::new().expect("Failed to create Tokio runtime");
+            runtime.block_on(future)
+        }
+        Err(_) => {
+            let runtime = Runtime::new().expect("Failed to create Tokio runtime");
+            runtime.block_on(future)
+        }
+    }
+}
+
+fn do_get(client: &HttpClient, url: &str) -> Result<JsHttpResponse, String> {
+    let config = RequestConfig::new(url.to_string());
+    let resp = block_on(client.execute_full(config))
+        .map_err(|e| format!("HTTP request failed: {}", e))?;
+    Ok(JsHttpResponse {
+        status: resp.status,
+        body: resp.body,
+        headers: resp.headers,
+    })
+}
+
+fn do_post(
+    client: &HttpClient,
+    url: &str,
+    body: Option<&str>,
+    content_type: Option<&str>,
+) -> Result<JsHttpResponse, String> {
+    let mut config = RequestConfig::new(url.to_string());
+    config.method = RequestMethod::Post;
+    config.content_type = content_type.map(|s| s.to_string());
+    config.body = body.and_then(|b| serde_json::from_str(b).ok());
+    
+    let resp = block_on(client.execute_full(config))
+        .map_err(|e| format!("HTTP request failed: {}", e))?;
+    Ok(JsHttpResponse {
+        status: resp.status,
+        body: resp.body,
+        headers: resp.headers,
+    })
+}
+
+fn do_request(
+    client: &HttpClient,
+    method: &str,
+    url: &str,
+    headers: HashMap<String, String>,
+    body: Option<&str>,
+    content_type: Option<&str>,
+) -> Result<JsHttpResponse, String> {
+    let mut config = RequestConfig::new(url.to_string());
+    config.method = match method.to_uppercase().as_str() {
+        "GET" => RequestMethod::Get,
+        "POST" => RequestMethod::Post,
+        "PUT" => RequestMethod::Put,
+        "DELETE" => RequestMethod::Delete,
+        "PATCH" => RequestMethod::Patch,
+        _ => RequestMethod::Get,
+    };
+    config.headers = headers;
+    config.content_type = content_type.map(|s| s.to_string());
+    config.body = body.and_then(|b| serde_json::from_str(b).ok());
+    
+    let resp = block_on(client.execute_full(config))
+        .map_err(|e| format!("HTTP request failed: {}", e))?;
+    Ok(JsHttpResponse {
+        status: resp.status,
+        body: resp.body,
+        headers: resp.headers,
+    })
 }
 
 /// JS runtime with DOM query APIs for HTML parsing.
@@ -49,7 +137,18 @@ impl JsRuntime {
     pub fn new() -> Self {
         let mut context = Context::default();
         Self::register_api(&mut context);
+        HTTP_CLIENT.with(|cell| *cell.borrow_mut() = None);
         Self { context }
+    }
+
+    pub fn with_http_client(http_client: HttpClient) -> Self {
+        let rt = Self::new();
+        HTTP_CLIENT.with(|cell| *cell.borrow_mut() = Some(Arc::new(http_client)));
+        rt
+    }
+
+    pub fn set_http_client(&mut self, http_client: HttpClient) {
+        HTTP_CLIENT.with(|cell| *cell.borrow_mut() = Some(Arc::new(http_client)));
     }
 
     /// Execute JS script with parse context
@@ -59,21 +158,16 @@ impl JsRuntime {
         script: &str,
         ctx: &ParseContext,
     ) -> Result<ExecuteResult, String> {
-        // Clear thread-local state
         SHARED_VARS.with(|cell| {
             *cell.borrow_mut() = ctx.shared.clone();
         });
         WEBVIEW_REQUEST.with(|cell| *cell.borrow_mut() = None);
         NEXT_PAGE_URL.with(|cell| *cell.borrow_mut() = None);
 
-        // Build init script to create context objects
         let init_script = Self::build_init_script(ctx);
-
-        // Execute init + user script
         let full_script = format!("{}\n{}", init_script, script);
         let result = self.execute(html, &full_script, Some(&ctx.to_vars()))?;
 
-        // Collect results
         let shared_updates = SHARED_VARS.with(|cell| cell.borrow().clone());
         let webview_request = WEBVIEW_REQUEST.with(|cell| cell.borrow().clone());
         let next_page_url = NEXT_PAGE_URL.with(|cell| cell.borrow().clone());
@@ -86,64 +180,28 @@ impl JsRuntime {
         })
     }
 
-    /// Build initialization script for context objects
     fn build_init_script(_ctx: &ParseContext) -> String {
         let mut lines = Vec::new();
-
-        // Create book object
         lines.push(
             "var book = typeof __book_json !== 'undefined' ? JSON.parse(__book_json) : null;"
                 .to_string(),
         );
-
-        // Create source object
         lines.push(
             "var source = typeof __source_json !== 'undefined' ? JSON.parse(__source_json) : null;"
                 .to_string(),
         );
-
-        // Create page object
         lines.push(
             "var page = typeof __page_json !== 'undefined' ? JSON.parse(__page_json) : null;"
                 .to_string(),
         );
-
-        // Create parseMode
         lines.push(
             "var parseMode = typeof __parse_mode !== 'undefined' ? __parse_mode : 'book_detail';"
                 .to_string(),
         );
-
-        // Create shared object with get/set methods (actual implementation via native functions)
         lines.push("var shared = { _data: typeof __shared_json !== 'undefined' ? JSON.parse(__shared_json) : {} };".to_string());
-
         lines.join("\n")
     }
 
-    /// Execute JS script on HTML with optional variables.
-    ///
-    /// # JS APIs
-    /// ## Query (jQuery-like)
-    /// - `$(selector)` / `$(parent, selector)` -> Element | null
-    /// - `$$(selector)` / `$$(parent, selector)` -> Element[]
-    ///
-    /// ## Element
-    /// - `text(el)` -> string (all descendant text)
-    /// - `ownText(el)` -> string (direct text nodes only)
-    /// - `attr(el, name)` -> string | null
-    /// - `html(el)` -> string (innerHTML)
-    /// - `hasClass(el, name)` -> boolean
-    ///
-    /// ## Encoding
-    /// - `base64Encode(str)` / `base64Decode(str)`
-    /// - `hexEncode(str)` / `hexDecode(str)`
-    ///
-    /// ## Crypto
-    /// - `md5(str)` / `sha256(str)` -> hex string
-    ///
-    /// ## Util
-    /// - `log(...)` - print to stdout
-    /// - `setHtml(html)` - set current document
     pub fn execute(
         &mut self,
         html: &str,
@@ -178,7 +236,6 @@ impl JsRuntime {
     }
 
     fn register_api(ctx: &mut Context) {
-        // Query
         ctx.register_global_builtin_callable(
             js_string!("$"),
             2,
@@ -192,7 +249,6 @@ impl JsRuntime {
         )
         .unwrap();
 
-        // Element
         ctx.register_global_builtin_callable(
             js_string!("text"),
             1,
@@ -224,7 +280,6 @@ impl JsRuntime {
         )
         .unwrap();
 
-        // Encoding
         ctx.register_global_builtin_callable(
             js_string!("base64Encode"),
             1,
@@ -250,7 +305,6 @@ impl JsRuntime {
         )
         .unwrap();
 
-        // Crypto
         ctx.register_global_builtin_callable(
             js_string!("md5"),
             1,
@@ -264,7 +318,6 @@ impl JsRuntime {
         )
         .unwrap();
 
-        // Util
         ctx.register_global_builtin_callable(
             js_string!("log"),
             1,
@@ -278,7 +331,6 @@ impl JsRuntime {
         )
         .unwrap();
 
-        // Shared variables
         ctx.register_global_builtin_callable(
             js_string!("sharedGet"),
             1,
@@ -292,7 +344,6 @@ impl JsRuntime {
         )
         .unwrap();
 
-        // WebView API (requests Dart layer to render URL)
         ctx.register_global_builtin_callable(
             js_string!("webview"),
             1,
@@ -300,16 +351,134 @@ impl JsRuntime {
         )
         .unwrap();
 
-        // Multi-page support
         ctx.register_global_builtin_callable(
             js_string!("setNextPage"),
             1,
             NativeFunction::from_fn_ptr(Self::js_set_next_page),
         )
         .unwrap();
+
+        ctx.register_global_builtin_callable(
+            js_string!("httpGet"),
+            1,
+            NativeFunction::from_fn_ptr(Self::js_http_get),
+        )
+        .unwrap();
+        ctx.register_global_builtin_callable(
+            js_string!("httpPost"),
+            2,
+            NativeFunction::from_fn_ptr(Self::js_http_post),
+        )
+        .unwrap();
+        ctx.register_global_builtin_callable(
+            js_string!("httpRequest"),
+            1,
+            NativeFunction::from_fn_ptr(Self::js_http_request),
+        )
+        .unwrap();
     }
 
-    // ========== Query ==========
+    fn make_response_obj(ctx: &mut Context, resp: &JsHttpResponse) -> JsValue {
+        let headers_obj = {
+            let mut builder = ObjectInitializer::new(ctx);
+            for (key, value) in &resp.headers {
+                builder.property(js_string!(key.clone()), js_string!(value.clone()), Attribute::all());
+            }
+            builder.build()
+        };
+        
+        let mut obj = ObjectInitializer::new(ctx);
+        obj.property(js_string!("status"), JsValue::from(resp.status as i32), Attribute::all());
+        obj.property(js_string!("body"), js_string!(resp.body.clone()), Attribute::all());
+        obj.property(js_string!("headers"), headers_obj, Attribute::all());
+        
+        JsValue::from(obj.build())
+    }
+
+    fn get_http_client() -> Result<Arc<HttpClient>, JsNativeError> {
+        HTTP_CLIENT.with(|cell| {
+            cell.borrow()
+                .clone()
+                .ok_or_else(|| JsNativeError::error().with_message("HTTP client not set. Use JsRuntime::with_http_client() or set_http_client()"))
+        })
+    }
+
+    fn js_http_get(_: &JsValue, args: &[JsValue], ctx: &mut Context) -> JsResult<JsValue> {
+        let url = args.get_or_undefined(0).to_string(ctx)?.to_std_string_escaped();
+        let client = Self::get_http_client()?;
+        let resp = do_get(&client, &url).map_err(|e| JsNativeError::error().with_message(e))?;
+        Ok(Self::make_response_obj(ctx, &resp))
+    }
+
+    fn js_http_post(_: &JsValue, args: &[JsValue], ctx: &mut Context) -> JsResult<JsValue> {
+        let url = args.get_or_undefined(0).to_string(ctx)?.to_std_string_escaped();
+        let body_arg = args.get_or_undefined(1);
+        
+        let (body, content_type) = if body_arg.is_undefined() || body_arg.is_null() {
+            (None, None)
+        } else if body_arg.is_object() {
+            let json = body_arg.to_json(ctx)?;
+            (Some(json.to_string()), Some("application/json".to_string()))
+        } else {
+            (Some(body_arg.to_string(ctx)?.to_std_string_escaped()), Some("text/plain".to_string()))
+        };
+
+        let client = Self::get_http_client()?;
+        let resp = do_post(&client, &url, body.as_deref(), content_type.as_deref())
+            .map_err(|e| JsNativeError::error().with_message(e))?;
+        Ok(Self::make_response_obj(ctx, &resp))
+    }
+
+    fn js_http_request(_: &JsValue, args: &[JsValue], ctx: &mut Context) -> JsResult<JsValue> {
+        let arg = args.get_or_undefined(0);
+        if let Some(obj) = arg.as_object() {
+            let url = obj.get(js_string!("url"), ctx)?.to_string(ctx)?.to_std_string_escaped();
+            let method_val = obj.get(js_string!("method"), ctx)?;
+            let headers_val = obj.get(js_string!("headers"), ctx)?;
+            let content_type_val = obj.get(js_string!("contentType"), ctx)?;
+            let body_val = obj.get(js_string!("body"), ctx)?;
+
+            let method = if method_val.is_undefined() || method_val.is_null() {
+                "GET".to_string()
+            } else {
+                method_val.to_string(ctx)?.to_std_string_escaped()
+            };
+
+            let mut headers = HashMap::new();
+            if !headers_val.is_undefined() && !headers_val.is_null() {
+                if let Ok(headers_json) = headers_val.to_json(ctx) {
+                    if let Some(hobj) = headers_json.as_object() {
+                        for (key, value) in hobj {
+                            if let Some(s) = value.as_str() {
+                                headers.insert(key.to_string(), s.to_string());
+                            }
+                        }
+                    }
+                }
+            }
+
+            let content_type = if content_type_val.is_undefined() || content_type_val.is_null() {
+                None
+            } else {
+                Some(content_type_val.to_string(ctx)?.to_std_string_escaped())
+            };
+
+            let body = if body_val.is_undefined() || body_val.is_null() {
+                None
+            } else if body_val.is_object() {
+                Some(body_val.to_json(ctx)?.to_string())
+            } else {
+                Some(body_val.to_string(ctx)?.to_std_string_escaped())
+            };
+
+            let client = Self::get_http_client()?;
+            let resp = do_request(&client, &method, &url, headers, body.as_deref(), content_type.as_deref())
+                .map_err(|e| JsNativeError::error().with_message(e))?;
+            Ok(Self::make_response_obj(ctx, &resp))
+        } else {
+            Err(JsNativeError::typ().with_message("httpRequest requires options object").into())
+        }
+    }
 
     fn js_select_one(_: &JsValue, args: &[JsValue], ctx: &mut Context) -> JsResult<JsValue> {
         let (parent, selector) = Self::parse_query_args(args, ctx)?;
@@ -453,8 +622,6 @@ impl JsRuntime {
         JsValue::from(builder.build())
     }
 
-    // ========== Element ==========
-
     fn get_element<F, R>(args: &[JsValue], ctx: &mut Context, f: F) -> JsResult<JsValue>
     where
         F: FnOnce(scraper::ElementRef) -> R,
@@ -552,8 +719,6 @@ impl JsRuntime {
         })
     }
 
-    // ========== Encoding ==========
-
     fn js_base64_encode(_: &JsValue, args: &[JsValue], ctx: &mut Context) -> JsResult<JsValue> {
         let s = args
             .get_or_undefined(0)
@@ -595,8 +760,6 @@ impl JsRuntime {
         Ok(JsValue::from(js_string!(text)))
     }
 
-    // ========== Crypto ==========
-
     fn js_md5(_: &JsValue, args: &[JsValue], ctx: &mut Context) -> JsResult<JsValue> {
         let s = args
             .get_or_undefined(0)
@@ -616,8 +779,6 @@ impl JsRuntime {
             s.as_bytes()
         )))))
     }
-
-    // ========== Util ==========
 
     fn js_log(_: &JsValue, args: &[JsValue], ctx: &mut Context) -> JsResult<JsValue> {
         let out: Vec<String> = args
@@ -640,8 +801,6 @@ impl JsRuntime {
         CURRENT_HTML.with(|cell| *cell.borrow_mut() = Some(Html::parse_document(&s)));
         Ok(JsValue::undefined())
     }
-
-    // ========== Shared Variables ==========
 
     fn js_shared_get(_: &JsValue, args: &[JsValue], ctx: &mut Context) -> JsResult<JsValue> {
         let key = args
@@ -672,16 +831,10 @@ impl JsRuntime {
         Ok(JsValue::undefined())
     }
 
-    // ========== WebView API ==========
-
-    /// Request WebView rendering from Dart layer
-    /// Usage: webview({ url: "...", js: "optional js", waitFor: ".selector" })
-    /// Returns: null (actual HTML will be provided by Dart in next execution)
     fn js_webview(_: &JsValue, args: &[JsValue], ctx: &mut Context) -> JsResult<JsValue> {
         let arg = args.get_or_undefined(0);
 
         if arg.is_string() {
-            // Simple form: webview("url")
             let url = arg.to_string(ctx)?.to_std_string_escaped();
             WEBVIEW_REQUEST.with(|cell| {
                 *cell.borrow_mut() = Some(WebViewRequest {
@@ -691,7 +844,6 @@ impl JsRuntime {
                 });
             });
         } else if let Some(obj) = arg.as_object() {
-            // Object form: webview({ url, js, waitFor })
             let url = obj
                 .get(js_string!("url"), ctx)?
                 .to_string(ctx)?
@@ -727,10 +879,6 @@ impl JsRuntime {
         Ok(JsValue::null())
     }
 
-    // ========== Multi-page Support ==========
-
-    /// Set next page URL for multi-page content
-    /// Usage: setNextPage("url") or setNextPage(null) to indicate no more pages
     fn js_set_next_page(_: &JsValue, args: &[JsValue], ctx: &mut Context) -> JsResult<JsValue> {
         let arg = args.get_or_undefined(0);
         if arg.is_null() || arg.is_undefined() {
@@ -752,6 +900,7 @@ impl Default for JsRuntime {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use mockito::mock;
 
     #[test]
     fn test_select() {
@@ -815,5 +964,75 @@ mod tests {
             .execute("", r#"setHtml("<p>New</p>"); text($("p"))"#, None)
             .unwrap();
         assert!(result.contains("New"));
+    }
+
+    #[test]
+    fn test_http_get_with_mock_server() {
+        let client = HttpClient::new().unwrap();
+        
+        let _m = mock("GET", "/test")
+            .with_status(200)
+            .with_header("Content-Type", "text/plain")
+            .with_body("Hello, World!")
+            .create();
+
+        let mut rt = JsRuntime::with_http_client(client);
+        let ctx = ParseContext::default();
+        let script = format!(r#"
+            let resp = httpGet("{}");
+            resp.body;
+        "#, format!("{}/test", mockito::server_url()));
+        
+        let result = rt.execute_with_context("", &script, &ctx).unwrap();
+        assert_eq!(result.json, "\"Hello, World!\"");
+    }
+
+    #[test]
+    fn test_http_post_with_mock_server() {
+        let client = HttpClient::new().unwrap();
+        
+        let _m = mock("POST", "/api")
+            .with_status(200)
+            .with_header("Content-Type", "application/json")
+            .with_body(r#"{"status": "ok"}"#)
+            .create();
+
+        let mut rt = JsRuntime::with_http_client(client);
+        let ctx = ParseContext::default();
+        let script = format!(r#"
+            let resp = httpPost("{}", {{ key: "value" }});
+            resp.body;
+        "#, format!("{}/api", mockito::server_url()));
+        
+        let result = rt.execute_with_context("", &script, &ctx).unwrap();
+        assert!(result.json.contains("ok"));
+    }
+
+    #[test]
+    fn test_http_request_full_with_mock_server() {
+        let client = HttpClient::new().unwrap();
+        
+        let _m = mock("PUT", "/api/v2")
+            .with_status(200)
+            .with_header("Content-Type", "application/json")
+            .with_body(r#"{"data": "test"}"#)
+            .create();
+
+        let mut rt = JsRuntime::with_http_client(client);
+        let ctx = ParseContext::default();
+        let script = format!(r#"
+            let resp = httpRequest({{
+                url: "{}",
+                method: "PUT",
+                headers: {{ "X-Custom": "test" }},
+                contentType: "application/json",
+                body: {{ data: "test" }}
+            }});
+            JSON.stringify({{ status: resp.status, body: resp.body }});
+        "#, format!("{}/api/v2", mockito::server_url()));
+        
+        let result = rt.execute_with_context("", &script, &ctx).unwrap();
+        assert!(result.json.contains("200"));
+        assert!(result.json.contains("test"));
     }
 }

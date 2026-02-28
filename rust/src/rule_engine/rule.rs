@@ -1,6 +1,15 @@
 //! Rule definitions for content sources
 
 use serde::{Deserialize, Serialize};
+use crate::request_config::RequestConfig;
+
+/// Request URL that can be either a string or a RequestConfig object
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(untagged)]
+pub enum RequestUrl {
+    String(String),
+    Config(RequestConfig),
+}
 
 /// Content source with parsing rules
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -74,7 +83,7 @@ pub enum UserVarType {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SearchRule {
     /// URL pattern, use {keyword} for search term
-    pub url: Vec<String>,
+    pub url: Vec<RequestUrl>,
     /// Selector for result list
     pub list: Vec<String>,
     pub id: Vec<String>,
@@ -92,7 +101,7 @@ pub struct SearchRule {
 /// Explore/Discovery rule
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ExploreRule {
-    pub url: String,
+    pub url: RequestUrl,
     /// Multiple sections on explore page
     #[serde(default)]
     pub sections: Vec<ExploreSectionRule>,
@@ -131,7 +140,7 @@ pub struct BookDetailRule {
 pub struct ChapterListRule {
     /// If chapters are on a separate page
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub url: Option<Vec<String>>,
+    pub url: Option<Vec<RequestUrl>>,
     pub list: Vec<String>,
     pub id: Vec<String>,
     pub title: Vec<String>,
