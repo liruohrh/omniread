@@ -1,6 +1,6 @@
 //! Tests for parse context, shared variables, webview API, and multi-page content
 
-use rust_lib_omniread::html_parser::{
+use rust_lib_omniread::js_engine::{
     BookContext, JsRuntime, PageContext, ParseContext, ParseMode, SourceContext,
 };
 use std::collections::HashMap;

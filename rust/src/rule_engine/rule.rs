@@ -9,7 +9,7 @@ pub struct Source {
     pub name: String,
     pub base_url: String,
     #[serde(default)]
-    pub content_type: crate::html_parser::dom::ContentType,
+    pub content_type: crate::js_engine::ContentType,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub icon: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -167,7 +167,7 @@ pub struct ContentRule {
     pub has_next_page: Option<Vec<String>>,
 }
 
-impl Default for crate::html_parser::dom::ContentType {
+impl Default for crate::js_engine::ContentType {
     fn default() -> Self {
         Self::Novel
     }

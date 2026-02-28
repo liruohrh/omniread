@@ -10,9 +10,8 @@
 //! - Plain text - literal value
 
 use regex::Regex;
-use yaml_rust::{Yaml, YamlLoader};
 
-use super::JsRuntime;
+use crate::js_engine::JsRuntime;
 
 /// Rule evaluation error
 #[derive(Debug)]

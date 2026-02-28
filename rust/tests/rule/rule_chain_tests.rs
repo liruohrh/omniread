@@ -1,6 +1,6 @@
 //! Rule chain execution tests
 
-use rust_lib_omniread::html_parser::RuleParser;
+use rust_lib_omniread::rule_engine::RuleParser;
 
 #[test]
 fn test_rule_chain_execution() {

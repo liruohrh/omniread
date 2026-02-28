@@ -6,7 +6,7 @@
 //! 3. 漫画《一拳超人》- 下拉式阅读
 //! 4. 小说《遮天》- 信息+目录同页，多页内容
 
-use rust_lib_omniread::html_parser::{
+use rust_lib_omniread::js_engine::{
     BookContext, JsRuntime, ParseContext, ParseMode, SourceContext,
 };
 use std::collections::HashMap;

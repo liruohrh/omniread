@@ -1,6 +1,6 @@
 //! Integration tests for HTML parsing with JS scripts
 
-use rust_lib_omniread::html_parser::JsRuntime;
+use rust_lib_omniread::js_engine::JsRuntime;
 
 const NOVEL_INFO_HTML: &str = include_str!("fixtures/novel_info.html");
 const CHAPTER_CONTENT_HTML: &str = include_str!("fixtures/chapter_content.html");

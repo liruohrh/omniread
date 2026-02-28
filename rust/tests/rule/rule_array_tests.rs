@@ -2,7 +2,7 @@
 
 use std::fs;
 
-use rust_lib_omniread::html_parser::RuleParser;
+use rust_lib_omniread::rule_engine::RuleParser;
 use yaml_rust::{Yaml, YamlLoader};
 
 #[test]

@@ -1,6 +1,6 @@
 //! Unit tests for JS API functions
 
-use rust_lib_omniread::html_parser::JsRuntime;
+use rust_lib_omniread::js_engine::JsRuntime;
 use std::collections::HashMap;
 
 const TEST_HTML: &str = include_str!("fixtures/test_basic.html");

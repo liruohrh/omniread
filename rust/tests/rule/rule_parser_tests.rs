@@ -2,8 +2,8 @@
 
 use std::fs;
 
-use rust_lib_omniread::html_parser::RuleParser;
-use rust_lib_omniread::html_parser::Source;
+use rust_lib_omniread::rule_engine::RuleParser;
+use rust_lib_omniread::rule_engine::Source;
 use serde_yaml;
 
 #[test]
