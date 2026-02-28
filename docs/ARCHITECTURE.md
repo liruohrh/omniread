@@ -150,6 +150,14 @@ Rust 无法直接创建 Android WebView。如果要从 Rust 调用，必须通�
 │  │ 规则解析器：执行规则数组，支持链式执行                        ││
 │  │ 支持多种规则类型：CSS, JS, 正则表达式, JSON Path             ││
 │  └─────────────────────────────────────────────────────────────┘│
+│  cookie 模块：                                                  ││
+│  ┌─────────────────────────────────────────────────────────────┐│
+│  │ CookieManager：线程安全的 Cookie 管理器                         ││
+│  │ CookieStorage：SQLite 持久化存储层                             ││
+│  │ 支持 CRUD 操作：创建、读取、更新、删除 Cookie                  ││
+│  │ 支持按域名、URL 查询 Cookie                                      ││
+│  │ 通过 flutter_rust_bridge 暴露给 Dart                          ││
+│  └─────────────────────────────────────────────────────────────┘│
 │                                                                 │
 │  数据流：                                                        │
 │  HTML string → scraper::Html → 规则解析 → JSON → Dart            │
@@ -285,6 +293,113 @@ webview({
 - ✅ `setNextPage()` — 多页内容支持
 
 这些 API 可以复用当前的 `NativeFunction` 注册机制，无需架构调整。
+
+---
+
+## 3. Cookie 管理：Rust SQLite + flutter_rust_bridge
+
+### 需求
+
+用户可以以 CRUD 的方式管理每个网站的 Cookie，支持：
+- 创建、读取、更新、删除 Cookie
+- 按域名查询 Cookie
+- 根据 URL 自动匹配适用的 Cookie
+- 持久化存储（SQLite）
+- 通过 flutter_rust_bridge 暴露给 Dart
+
+### 实现架构
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                         Dart (Flutter)                          │
+├─────────────────────────────────────────────────────────────────┤
+│  调用 Cookie API（通过 flutter_rust_bridge）                       │
+│  - init_cookie_manager_in_memory() / init_cookie_manager_from_path()│
+│  - create_cookie(), get_cookie(), update_cookie(), delete_cookie()│
+│  - get_cookies_by_domain(), get_cookies_for_url()                │
+└─────────────────────────────────────────────────────────────────┘
+                              │ FFI
+                              ▼
+┌─────────────────────────────────────────────────────────────────┐
+│                       Rust (rust_lib_omniread)                  │
+├─────────────────────────────────────────────────────────────────┤
+│  cookie 模块：                                                    │
+│  ┌─────────────────────────────────────────────────────────────┐│
+│  │ CookieManager（线程安全）                                       ││
+│  │  ├── 使用 Arc<Mutex<CookieStorage>> 保证线程安全              ││
+│  │  ├── 提供 CRUD 业务逻辑                                       ││
+│  │  └── 通过 OnceLock 单例管理全局实例                           ││
+│  └─────────────────────────────────────────────────────────────┘│
+│  ┌─────────────────────────────────────────────────────────────┐│
+│  │ CookieStorage（SQLite 存储层）                                 ││
+│  │  ├── 初始化数据库表和索引                                      ││
+│  │  ├── 实现完整的 CRUD 操作                                      ││
+│  │  ├── 支持按域名、ID 查询                                       ││
+│  │  └── 使用 rusqlite 操作 SQLite                                ││
+│  └─────────────────────────────────────────────────────────────┘│
+│  ┌─────────────────────────────────────────────────────────────┐│
+│  │ 数据模型                                                        ││
+│  │  ├── Cookie：完整的 Cookie 结构体（包含 id, name, value,      ││
+│  │  │   domain, path, secure, http_only, same_site, expires,   ││
+│  │  │   created_at, updated_at）                                 ││
+│  │  ├── CookieCreate：创建 Cookie 时的输入结构                   ││
+│  │  └── CookieUpdate：更新 Cookie 时的输入结构（可选字段）        ││
+│  └─────────────────────────────────────────────────────────────┘│
+└─────────────────────────────────────────────────────────────────┘
+```
+
+### 数据库设计
+
+```sql
+CREATE TABLE cookies (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT NOT NULL,
+    value TEXT NOT NULL,
+    domain TEXT NOT NULL,
+    path TEXT NOT NULL,
+    secure INTEGER NOT NULL DEFAULT 0,
+    http_only INTEGER NOT NULL DEFAULT 0,
+    same_site TEXT,
+    expires TEXT,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+);
+
+CREATE INDEX idx_cookies_domain ON cookies (domain);
+CREATE INDEX idx_cookies_domain_name ON cookies (domain, name);
+```
+
+### 暴露给 Dart 的 API
+
+| 函数 | 说明 |
+|------|------|
+| `init_cookie_manager_in_memory()` | 初始化内存数据库（用于测试） |
+| `init_cookie_manager_from_path(path)` | 初始化文件数据库 |
+| `create_cookie(cookie)` | 创建 Cookie，返回 ID |
+| `get_cookie(id)` | 获取单个 Cookie |
+| `get_cookies_by_domain(domain)` | 按域名获取所有 Cookie |
+| `get_all_cookies()` | 获取所有 Cookie |
+| `update_cookie(id, update)` | 更新 Cookie |
+| `delete_cookie(id)` | 删除 Cookie |
+| `delete_cookies_by_domain(domain)` | 按域名删除所有 Cookie |
+| `delete_all_cookies()` | 删除所有 Cookie |
+| `get_cookies_for_url(url)` | 根据 URL 获取适用的 Cookie |
+
+### 线程安全设计
+
+- 使用 `Arc<Mutex<CookieStorage>>` 保证多线程安全访问
+- 使用 `OnceLock` 实现全局单例管理器
+- `flutter_rust_bridge` 默认在线程池执行，Mutex 确保数据一致性
+
+### 未来扩展
+
+预留了以下功能的扩展空间：
+- HTTP 请求自动携带 Cookie（使用 reqwest + cookie_store）
+- WebView 请求自动同步 Cookie
+- Cookie 导入/导出（JSON 格式）
+- Cookie 过期自动清理
+
+---
 
 ### 不推荐的方案
 

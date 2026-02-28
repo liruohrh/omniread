@@ -1,3 +1,6 @@
 - [x] webview api
 - [x] js engine
+- [x] cookie management (SQLite + CRUD)
 - [ ] content rule engine
+- [ ] HTTP request with cookie integration
+- [ ] WebView cookie sync
