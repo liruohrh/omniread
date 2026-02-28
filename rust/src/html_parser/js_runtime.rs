@@ -7,12 +7,28 @@ use boa_engine::{
 };
 use md5::{Digest as Md5Digest, Md5};
 use scraper::{Html, Node, Selector};
-use sha2::{Digest as Sha2Digest, Sha256};
+use sha2::Sha256;
 use std::cell::RefCell;
 use std::collections::HashMap;
 
+use super::context::ParseContext;
+
 thread_local! {
     static CURRENT_HTML: RefCell<Option<Html>> = RefCell::new(None);
+    /// Shared variables storage for JS access
+    static SHARED_VARS: RefCell<HashMap<String, String>> = RefCell::new(HashMap::new());
+    /// WebView request storage
+    static WEBVIEW_REQUEST: RefCell<Option<WebViewRequest>> = RefCell::new(None);
+    /// Next page URL for multi-page content
+    static NEXT_PAGE_URL: RefCell<Option<String>> = RefCell::new(None);
+}
+
+/// WebView request from JS
+#[derive(Debug, Clone)]
+pub struct WebViewRequest {
+    pub url: String,
+    pub js: Option<String>,
+    pub wait_for: Option<String>,
 }
 
 /// JS runtime with DOM query APIs for HTML parsing.
@@ -20,11 +36,88 @@ pub struct JsRuntime {
     context: Context,
 }
 
+/// Extended execution result
+#[derive(Debug)]
+pub struct ExecuteResult {
+    pub json: String,
+    pub shared_updates: HashMap<String, String>,
+    pub webview_request: Option<WebViewRequest>,
+    pub next_page_url: Option<String>,
+}
+
 impl JsRuntime {
     pub fn new() -> Self {
         let mut context = Context::default();
         Self::register_api(&mut context);
         Self { context }
+    }
+
+    /// Execute JS script with parse context
+    pub fn execute_with_context(
+        &mut self,
+        html: &str,
+        script: &str,
+        ctx: &ParseContext,
+    ) -> Result<ExecuteResult, String> {
+        // Clear thread-local state
+        SHARED_VARS.with(|cell| {
+            *cell.borrow_mut() = ctx.shared.clone();
+        });
+        WEBVIEW_REQUEST.with(|cell| *cell.borrow_mut() = None);
+        NEXT_PAGE_URL.with(|cell| *cell.borrow_mut() = None);
+
+        // Build init script to create context objects
+        let init_script = Self::build_init_script(ctx);
+
+        // Execute init + user script
+        let full_script = format!("{}\n{}", init_script, script);
+        let result = self.execute(html, &full_script, Some(&ctx.to_vars()))?;
+
+        // Collect results
+        let shared_updates = SHARED_VARS.with(|cell| cell.borrow().clone());
+        let webview_request = WEBVIEW_REQUEST.with(|cell| cell.borrow().clone());
+        let next_page_url = NEXT_PAGE_URL.with(|cell| cell.borrow().clone());
+
+        Ok(ExecuteResult {
+            json: result,
+            shared_updates,
+            webview_request,
+            next_page_url,
+        })
+    }
+
+    /// Build initialization script for context objects
+    fn build_init_script(_ctx: &ParseContext) -> String {
+        let mut lines = Vec::new();
+
+        // Create book object
+        lines.push(
+            "var book = typeof __book_json !== 'undefined' ? JSON.parse(__book_json) : null;"
+                .to_string(),
+        );
+
+        // Create source object
+        lines.push(
+            "var source = typeof __source_json !== 'undefined' ? JSON.parse(__source_json) : null;"
+                .to_string(),
+        );
+
+        // Create page object
+        lines.push(
+            "var page = typeof __page_json !== 'undefined' ? JSON.parse(__page_json) : null;"
+                .to_string(),
+        );
+
+        // Create parseMode
+        lines.push(
+            "var parseMode = typeof __parse_mode !== 'undefined' ? __parse_mode : 'book_detail';"
+                .to_string(),
+        );
+
+        // Create shared object with get/set methods (actual implementation via native functions)
+        lines.push("var shared = { _data: typeof __shared_json !== 'undefined' ? JSON.parse(__shared_json) : {} };".to_string());
+
+        lines.join("\n")
     }
 
     /// Execute JS script on HTML with optional variables.
@@ -182,6 +275,36 @@ impl JsRuntime {
             js_string!("setHtml"),
             1,
             NativeFunction::from_fn_ptr(Self::js_set_html),
+        )
+        .unwrap();
+
+        // Shared variables
+        ctx.register_global_builtin_callable(
+            js_string!("sharedGet"),
+            1,
+            NativeFunction::from_fn_ptr(Self::js_shared_get),
+        )
+        .unwrap();
+        ctx.register_global_builtin_callable(
+            js_string!("sharedSet"),
+            2,
+            NativeFunction::from_fn_ptr(Self::js_shared_set),
+        )
+        .unwrap();
+
+        // WebView API (requests Dart layer to render URL)
+        ctx.register_global_builtin_callable(
+            js_string!("webview"),
+            1,
+            NativeFunction::from_fn_ptr(Self::js_webview),
+        )
+        .unwrap();
+
+        // Multi-page support
+        ctx.register_global_builtin_callable(
+            js_string!("setNextPage"),
+            1,
+            NativeFunction::from_fn_ptr(Self::js_set_next_page),
         )
         .unwrap();
     }
@@ -515,6 +638,107 @@ impl JsRuntime {
             .to_string(ctx)?
             .to_std_string_escaped();
         CURRENT_HTML.with(|cell| *cell.borrow_mut() = Some(Html::parse_document(&s)));
+        Ok(JsValue::undefined())
+    }
+
+    // ========== Shared Variables ==========
+
+    fn js_shared_get(_: &JsValue, args: &[JsValue], ctx: &mut Context) -> JsResult<JsValue> {
+        let key = args
+            .get_or_undefined(0)
+            .to_string(ctx)?
+            .to_std_string_escaped();
+        SHARED_VARS.with(|cell| {
+            let vars = cell.borrow();
+            match vars.get(&key) {
+                Some(v) => Ok(JsValue::from(js_string!(v.clone()))),
+                None => Ok(JsValue::null()),
+            }
+        })
+    }
+
+    fn js_shared_set(_: &JsValue, args: &[JsValue], ctx: &mut Context) -> JsResult<JsValue> {
+        let key = args
+            .get_or_undefined(0)
+            .to_string(ctx)?
+            .to_std_string_escaped();
+        let value = args
+            .get_or_undefined(1)
+            .to_string(ctx)?
+            .to_std_string_escaped();
+        SHARED_VARS.with(|cell| {
+            cell.borrow_mut().insert(key, value);
+        });
+        Ok(JsValue::undefined())
+    }
+
+    // ========== WebView API ==========
+
+    /// Request WebView rendering from Dart layer
+    /// Usage: webview({ url: "...", js: "optional js", waitFor: ".selector" })
+    /// Returns: null (actual HTML will be provided by Dart in next execution)
+    fn js_webview(_: &JsValue, args: &[JsValue], ctx: &mut Context) -> JsResult<JsValue> {
+        let arg = args.get_or_undefined(0);
+
+        if arg.is_string() {
+            // Simple form: webview("url")
+            let url = arg.to_string(ctx)?.to_std_string_escaped();
+            WEBVIEW_REQUEST.with(|cell| {
+                *cell.borrow_mut() = Some(WebViewRequest {
+                    url,
+                    js: None,
+                    wait_for: None,
+                });
+            });
+        } else if let Some(obj) = arg.as_object() {
+            // Object form: webview({ url, js, waitFor })
+            let url = obj
+                .get(js_string!("url"), ctx)?
+                .to_string(ctx)?
+                .to_std_string_escaped();
+            let js_val = obj.get(js_string!("js"), ctx)?;
+            let wait_for_val = obj.get(js_string!("waitFor"), ctx)?;
+
+            let js_str = if js_val.is_undefined() || js_val.is_null() {
+                None
+            } else {
+                Some(js_val.to_string(ctx)?.to_std_string_escaped())
+            };
+
+            let wait_for_str = if wait_for_val.is_undefined() || wait_for_val.is_null() {
+                None
+            } else {
+                Some(wait_for_val.to_string(ctx)?.to_std_string_escaped())
+            };
+
+            WEBVIEW_REQUEST.with(|cell| {
+                *cell.borrow_mut() = Some(WebViewRequest {
+                    url,
+                    js: js_str,
+                    wait_for: wait_for_str,
+                });
+            });
+        } else {
+            return Err(JsNativeError::typ()
+                .with_message("webview requires url string or options object")
+                .into());
+        }
+
+        Ok(JsValue::null())
+    }
+
+    // ========== Multi-page Support ==========
+
+    /// Set next page URL for multi-page content
+    /// Usage: setNextPage("url") or setNextPage(null) to indicate no more pages
+    fn js_set_next_page(_: &JsValue, args: &[JsValue], ctx: &mut Context) -> JsResult<JsValue> {
+        let arg = args.get_or_undefined(0);
+        if arg.is_null() || arg.is_undefined() {
+            NEXT_PAGE_URL.with(|cell| *cell.borrow_mut() = None);
+        } else {
+            let url = arg.to_string(ctx)?.to_std_string_escaped();
+            NEXT_PAGE_URL.with(|cell| *cell.borrow_mut() = Some(url));
+        }
         Ok(JsValue::undefined())
     }
 }

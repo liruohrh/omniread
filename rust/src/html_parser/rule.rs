@@ -25,25 +25,68 @@ pub struct Source {
     /// Custom headers for requests
     #[serde(default, skip_serializing_if = "std::collections::HashMap::is_empty")]
     pub headers: std::collections::HashMap<String, String>,
+    /// User-configurable variables (e.g., cookie, token, user_id)
+    /// These can be set by users in the app settings
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub user_vars: Vec<UserVariable>,
+    /// Rule array for complex parsing (chain execution)
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub rules: Vec<String>,
+}
+
+/// User-configurable variable definition
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct UserVariable {
+    /// Variable name (used in JS as user var)
+    pub name: String,
+    /// Display label for UI
+    pub label: String,
+    /// Variable type
+    #[serde(default)]
+    pub var_type: UserVarType,
+    /// Default value
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub default: Option<String>,
+    /// Placeholder text for input
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub placeholder: Option<String>,
+    /// Whether this variable is required
+    #[serde(default)]
+    pub required: bool,
+    /// Description/help text
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub description: Option<String>,
+}
+
+/// User variable type
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum UserVarType {
+    #[default]
+    Text,
+    Password,
+    Cookie,
+    Number,
+    Url,
 }
 
 /// Search rule
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SearchRule {
     /// URL pattern, use {keyword} for search term
-    pub url: String,
+    pub url: Vec<String>,
     /// Selector for result list
-    pub list: String,
-    pub id: String,
-    pub title: String,
+    pub list: Vec<String>,
+    pub id: Vec<String>,
+    pub title: Vec<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub author: Option<String>,
+    pub author: Option<Vec<String>>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub cover: Option<String>,
+    pub cover: Option<Vec<String>>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub url_pattern: Option<String>,
+    pub url_pattern: Option<Vec<String>>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub description: Option<String>,
+    pub description: Option<Vec<String>>,
 }
 
 /// Explore/Discovery rule
@@ -57,30 +100,30 @@ pub struct ExploreRule {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ExploreSectionRule {
-    pub title: String,
-    pub list: String,
-    pub id: String,
+    pub title: Vec<String>,
+    pub list: Vec<String>,
+    pub id: Vec<String>,
     #[serde(rename = "itemTitle")]
-    pub item_title: String,
+    pub item_title: Vec<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub cover: Option<String>,
+    pub cover: Option<Vec<String>>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub url_pattern: Option<String>,
+    pub url_pattern: Option<Vec<String>>,
 }
 
 /// Book detail page rule
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct BookDetailRule {
-    pub title: String,
-    pub author: String,
+    pub title: Vec<String>,
+    pub author: Vec<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub cover: Option<String>,
+    pub cover: Option<Vec<String>>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub description: Option<String>,
+    pub description: Option<Vec<String>>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub status: Option<String>,
+    pub status: Option<Vec<String>>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub tags: Option<String>,
+    pub tags: Option<Vec<String>>,
 }
 
 /// Chapter list rule
@@ -88,29 +131,40 @@ pub struct BookDetailRule {
 pub struct ChapterListRule {
     /// If chapters are on a separate page
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub url: Option<String>,
-    pub list: String,
-    pub id: String,
-    pub title: String,
+    pub url: Option<Vec<String>>,
+    pub list: Vec<String>,
+    pub id: Vec<String>,
+    pub title: Vec<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub url_pattern: Option<String>,
+    pub url_pattern: Option<Vec<String>>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub date: Option<String>,
+    pub date: Option<Vec<String>>,
+    /// Next page URL for paginated chapter list
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub next_page: Option<Vec<String>>,
+    /// Selector to check if there are more pages
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub has_next_page: Option<Vec<String>>,
 }
 
 /// Content page rule
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ContentRule {
-    pub title: String,
     /// For novel: text selector; for comic: image list selector
-    pub content: String,
+    pub content: Vec<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub next_url: Option<String>,
+    pub next_url: Option<Vec<String>>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub prev_url: Option<String>,
+    pub prev_url: Option<Vec<String>>,
     /// Content filter (remove ads, etc.)
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub filter: Option<String>,
+    pub filter: Option<Vec<String>>,
+    /// Next page URL for paginated content (within same chapter)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub next_page: Option<Vec<String>>,
+    /// Selector to check if there are more pages
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub has_next_page: Option<Vec<String>>,
 }
 
 impl Default for crate::html_parser::dom::ContentType {

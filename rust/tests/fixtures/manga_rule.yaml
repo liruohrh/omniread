@@ -1,0 +1,23 @@
+id: opm-manga
+name: 一拳超人漫画
+base_url: https://example.com
+content_type: comic
+
+book_detail:
+  title: ["@css:.manga-title"]
+  author: ["@css:.author a"]
+  cover: ["@css:.cover@data-src"]
+  description: ["@css:.description"]
+  status: ["@css:.status"]
+  tags: ["@js:(function() { let tags = $$('.tag'); let result = []; for(let i=0; i<tags.length; i++) { result.push(text(tags[i])); } return result; })()"]
+
+chapter_list:
+  list: [".chapter-item"]
+  id: ["@css:.chapter-item@data-chapter-id"]
+  title: ["@js:(function() { return text($('.chapter-num')) + ' ' + text($('.chapter-title')); })()"]
+  url_pattern: ["@css:a@href"]
+  date: ["@css:.chapter-date"]
+
+content:
+  title: ["@css:h1"]
+  content: ["@js:(function() { let images = $$('.chapter-content img'); let result = []; for(let i=0; i<images.length; i++) { let src = attr(images[i], 'src') || attr(images[i], 'data-src'); if(src) result.push(src); } return JSON.stringify(result); })()"]

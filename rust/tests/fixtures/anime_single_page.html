@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <title>My Hero Academia - Episode 1</title>
+</head>
+
+<body>
+    <div class="anime-container" data-anime-id="mha-001">
+        <!-- Anime Info Section -->
+        <section class="anime-info">
+            <div class="cover-wrapper">
+                <img class="cover" data-src="https://example.com/covers/mha.jpg" alt="My Hero Academia">
+            </div>
+            <div class="meta">
+                <h1 class="title">My Hero Academia</h1>
+                <p class="alt-title">僕のヒーローアカデミア</p>
+                <div class="creator-info">
+                    <span class="label">Studio:</span>
+                    <a href="/studio/bones" class="studio">Bones</a>
+                </div>
+                <div class="creator-info">
+                    <span class="label">Director:</span>
+                    <span class="director">Kenji Nagasaki</span>
+                </div>
+                <p class="description">
+                    In a world where most people have superpowers called "Quirks,"
+                    Izuku Midoriya dreams of becoming a hero despite being born without powers.
+                </p>
+                <div class="tags">
+                    <span class="tag" data-tag="action">Action</span>
+                    <span class="tag" data-tag="superhero">Superhero</span>
+                    <span class="tag" data-tag="school">School</span>
+                </div>
+                <div class="stats">
+                    <span class="rating">9.2</span>
+                    <span class="views">5,432,100</span>
+                </div>
+            </div>
+        </section>
+
+        <!-- Episode List Section -->
+        <section class="episode-list">
+            <h2>Episodes</h2>
+            <ul class="episodes" id="episode-list">
+                <li class="episode-item" data-episode-id="ep001" data-order="1">
+                    <a href="#ep001" class="episode-link">
+                        <span class="episode-num">Episode 1</span>
+                        <span class="episode-title">Izuku Midoriya: Origin</span>
+                        <span class="episode-date">2016-04-03</span>
+                        <span class="episode-duration">24:00</span>
+                    </a>
+                </li>
+                <li class="episode-item" data-episode-id="ep002" data-order="2">
+                    <a href="#ep002" class="episode-link">
+                        <span class="episode-num">Episode 2</span>
+                        <span class="episode-title">What It Takes to Be a Hero</span>
+                        <span class="episode-date">2016-04-10</span>
+                        <span class="episode-duration">24:00</span>
+                    </a>
+                </li>
+                <li class="episode-item" data-episode-id="ep003" data-order="3">
+                    <a href="#ep003" class="episode-link">
+                        <span class="episode-num">Episode 3</span>
+                        <span class="episode-title">Roaring Muscles</span>
+                        <span class="episode-date">2016-04-17</span>
+                        <span class="episode-duration">24:00</span>
+                    </a>
+                </li>
+            </ul>
+        </section>
+
+        <!-- Current Episode Content Section -->
+        <section class="video-player" id="current-episode" data-current-id="ep001">
+            <h3 class="current-title">Episode 1: Izuku Midoriya: Origin</h3>
+            <div class="player-container">
+                <video id="video-element" data-src="https://example.com/video/mha-ep001.mp4">
+                    <source src="https://example.com/video/mha-ep001.mp4" type="video/mp4">
+                </video>
+            </div>
+            <div class="video-info">
+                <p class="synopsis">
+                    Izuku Midoriya desperately wants to be a hero, but he's one of the few
+                    who was born without a superpower, or "Quirk."
+                </p>
+                <div class="subtitles-info">
+                    <a href="https://example.com/subs/mha-ep001-en.vtt" class="subtitle" data-lang="en">English</a>
+                    <a href="https://example.com/subs/mha-ep001-jp.vtt" class="subtitle" data-lang="jp">Japanese</a>
+                </div>
+            </div>
+        </section>
+
+        <!-- Navigation -->
+        <nav class="episode-nav">
+            <a href="#" class="nav-prev disabled">Previous</a>
+            <a href="#ep002" class="nav-next">Next Episode</a>
+        </nav>
+    </div>
+</body>
+
+</html>

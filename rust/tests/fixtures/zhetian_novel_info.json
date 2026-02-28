@@ -1,0 +1,128 @@
+{
+  "novel": {
+    "id": "zhetian-001",
+    "title": "遮天",
+    "subtitle": "Shrouding the Heavens",
+    "author": "辰东",
+    "status": "已完结",
+    "status_code": "completed",
+    "category": "东方玄幻",
+    "word_count": "670万字",
+    "update_time": "2014-08-08",
+    "cover": "https://img.example.com/novels/zhetian/cover.jpg",
+    "intro": "冰冷与黑暗并存的宇宙深处，九具庞大的龙尸拉着一座青铜古棺，正朝着茫茫太空深处飞去。\n数万年后，一群学生在泰山脚下的古九龙拉棺中，发现了一块黑色的玉石......从此，一场跨越无数时空的旅程就此展开。\n这是一个关于修仙、成圣、登天的故事。在这个波澜壮阔的世界里，主角叶凡将经历无数磨难，最终问鼎苍穹。",
+    "tags": ["玄幻", "修仙", "东方", "经典", "冒险"],
+    "stats": {
+      "views": "15,678,234",
+      "rating": "9.6",
+      "favorites": "1,234,567",
+      "recommend": "987,654"
+    },
+    "chapters": {
+      "total": 1880,
+      "volumes": [
+        {
+          "id": "1",
+          "title": "第一卷 九龙拉棺",
+          "chapter_list": [
+            {
+              "id": "ch0001",
+              "title": "第一章 九龙拉棺",
+              "update_time": "2010-05-01",
+              "url": "/novel/zhetian-001/chapter/ch0001"
+            },
+            {
+              "id": "ch0002",
+              "title": "第二章 黑色玉石",
+              "update_time": "2010-05-01",
+              "url": "/novel/zhetian-001/chapter/ch0002"
+            },
+            {
+              "id": "ch0003",
+              "title": "第三章 火星古迹",
+              "update_time": "2010-05-02",
+              "url": "/novel/zhetian-001/chapter/ch0003"
+            },
+            {
+              "id": "ch0004",
+              "title": "第四章 古今变迁",
+              "update_time": "2010-05-02",
+              "url": "/novel/zhetian-001/chapter/ch0004"
+            },
+            {
+              "id": "ch0005",
+              "title": "第五章 陌生世界",
+              "update_time": "2010-05-03",
+              "url": "/novel/zhetian-001/chapter/ch0005"
+            }
+          ]
+        },
+        {
+          "id": "2",
+          "title": "第二卷 北邙山",
+          "chapter_list": [
+            {
+              "id": "ch0006",
+              "title": "第六章 修行之始",
+              "update_time": "2010-05-03",
+              "url": "/novel/zhetian-001/chapter/ch0006"
+            },
+            {
+              "id": "ch0007",
+              "title": "第七章 道经",
+              "update_time": "2010-05-04",
+              "url": "/novel/zhetian-001/chapter/ch0007"
+            },
+            {
+              "id": "ch0008",
+              "title": "第八章 圣地传承",
+              "update_time": "2010-05-04",
+              "url": "/novel/zhetian-001/chapter/ch0008"
+            },
+            {
+              "id": "ch0009",
+              "title": "第九章 妖族",
+              "update_time": "2010-05-05",
+              "url": "/novel/zhetian-001/chapter/ch0009"
+            },
+            {
+              "id": "ch0010",
+              "title": "第十章 神秘少女",
+              "update_time": "2010-05-05",
+              "url": "/novel/zhetian-001/chapter/ch0010"
+            }
+          ]
+        },
+        {
+          "id": "latest",
+          "title": "最新章节",
+          "chapter_list": [
+            {
+              "id": "ch1880",
+              "title": "第1880章 大结局",
+              "update_time": "2014-08-08",
+              "url": "/novel/zhetian-001/chapter/ch1880"
+            },
+            {
+              "id": "ch1879",
+              "title": "第1879章 天地同寿",
+              "update_time": "2014-08-07",
+              "url": "/novel/zhetian-001/chapter/ch1879"
+            },
+            {
+              "id": "ch1878",
+              "title": "第1878章 永恒",
+              "update_time": "2014-08-06",
+              "url": "/novel/zhetian-001/chapter/ch1878"
+            }
+          ]
+        }
+      ],
+      "pagination": {
+        "current_page": 1,
+        "total_pages": 188,
+        "next_page": "/novel/zhetian-001?page=2"
+      }
+    }
+  }
+}

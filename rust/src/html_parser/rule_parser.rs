@@ -1,4 +1,4 @@
-//! Rule parser - evaluates selectors against HTML
+//! Rule parser - evaluates selectors against HTML/JSON
 //!
 //! Selector format:
 //! - `@css:.selector` - CSS selector, get text
@@ -6,9 +6,11 @@
 //! - `@js:script` - JavaScript expression
 //! - `@re:pattern` - Regex on raw HTML
 //! - `@re:pattern##replacement` - Regex replace
+//! - `@json:$.path` - JSON Path selector (for JSON content)
 //! - Plain text - literal value
 
 use regex::Regex;
+use yaml_rust::{Yaml, YamlLoader};
 
 use super::JsRuntime;
 
@@ -18,6 +20,7 @@ pub enum RuleError {
     InvalidSelector(String),
     JsError(String),
     RegexError(String),
+    JsonPathError(String),
     WebViewNotSupported,
 }
 
@@ -27,6 +30,7 @@ impl std::fmt::Display for RuleError {
             Self::InvalidSelector(s) => write!(f, "Invalid selector: {}", s),
             Self::JsError(s) => write!(f, "JS error: {}", s),
             Self::RegexError(s) => write!(f, "Regex error: {}", s),
+            Self::JsonPathError(s) => write!(f, "JSONPath error: {}", s),
             Self::WebViewNotSupported => write!(f, "WebView not supported"),
         }
     }
@@ -58,12 +62,48 @@ impl RuleParser {
             self.eval_js(&rule[4..])
         } else if rule.starts_with("@re:") {
             self.eval_regex(&rule[4..])
+        } else if rule.starts_with("@json:") {
+            self.eval_json(&rule[6..])
         } else if rule.starts_with("@webview:") {
             Err(RuleError::WebViewNotSupported)
         } else if rule.starts_with(".") || rule.starts_with("#") || rule.contains(" ") {
             self.eval_css(rule)
         } else {
             Ok(rule.to_string())
+        }
+    }
+
+    /// Evaluate an array of rules (chain execution)
+    /// Each rule's result is passed as input to the next rule
+    pub fn eval_rules(&mut self, rules: &[String]) -> Result<String, RuleError> {
+        let mut result = self.html.clone();
+
+        for rule in rules {
+            let rule = rule.trim();
+
+            // Create a temporary parser with the current result as input
+            let mut temp_parser = RuleParser::new(&result);
+            result = temp_parser.eval(rule)?;
+        }
+
+        Ok(result)
+    }
+
+    /// Evaluate an optional array of rules
+    pub fn eval_opt_rules(
+        &mut self,
+        rules: &Option<Vec<String>>,
+    ) -> Result<Option<String>, RuleError> {
+        match rules {
+            Some(rules) if !rules.is_empty() => {
+                let result = self.eval_rules(rules)?;
+                if result.is_empty() {
+                    Ok(None)
+                } else {
+                    Ok(Some(result))
+                }
+            }
+            _ => Ok(None),
         }
     }
 
@@ -130,6 +170,28 @@ impl RuleParser {
         }
     }
 
+    fn eval_json(&self, path: &str) -> Result<String, RuleError> {
+        // Parse JSON from content (html field stores raw content)
+        let json: serde_json::Value = serde_json::from_str(&self.html)
+            .map_err(|e| RuleError::JsonPathError(format!("Invalid JSON: {}", e)))?;
+
+        // Use jsonpath_lib
+        let result = jsonpath_lib::select(&json, path)
+            .map_err(|e| RuleError::JsonPathError(format!("Invalid JSONPath '{}': {}", path, e)))?;
+
+        // Convert result to string
+        match result.as_slice() {
+            [] => Ok(String::new()),
+            [single] => json_value_to_string(single),
+            multiple => {
+                // Return as JSON array
+                let arr: Vec<_> = multiple.iter().collect();
+                serde_json::to_string(&arr)
+                    .map_err(|e| RuleError::JsonPathError(format!("Serialize error: {}", e)))
+            }
+        }
+    }
+
     pub fn eval_list(
         &mut self,
         list_sel: &str,
@@ -159,6 +221,18 @@ impl RuleParser {
             }
         }
         Ok(results)
+    }
+}
+
+/// Convert JSON value to string representation
+fn json_value_to_string(value: &serde_json::Value) -> Result<String, RuleError> {
+    match value {
+        serde_json::Value::Null => Ok(String::new()),
+        serde_json::Value::Bool(b) => Ok(b.to_string()),
+        serde_json::Value::Number(n) => Ok(n.to_string()),
+        serde_json::Value::String(s) => Ok(s.clone()),
+        _ => serde_json::to_string(value)
+            .map_err(|e| RuleError::JsonPathError(format!("Serialize error: {}", e))),
     }
 }
 
@@ -197,5 +271,82 @@ mod tests {
             parser.eval("@webview:test"),
             Err(RuleError::WebViewNotSupported)
         ));
+    }
+
+    #[test]
+    fn test_json_path_simple() {
+        let json = r#"{"title": "遮天", "author": "辰东"}"#;
+        let mut parser = RuleParser::new(json);
+        assert_eq!(parser.eval("@json:$.title").unwrap(), "遮天");
+        assert_eq!(parser.eval("@json:$.author").unwrap(), "辰东");
+    }
+
+    #[test]
+    fn test_json_path_nested() {
+        let json = r#"{"book": {"title": "遮天", "info": {"status": "completed"}}}"#;
+        let mut parser = RuleParser::new(json);
+        assert_eq!(parser.eval("@json:$.book.title").unwrap(), "遮天");
+        assert_eq!(
+            parser.eval("@json:$.book.info.status").unwrap(),
+            "completed"
+        );
+    }
+
+    #[test]
+    fn test_json_path_array() {
+        let json =
+            r#"{"chapters": [{"id": "ch1", "title": "第一章"}, {"id": "ch2", "title": "第二章"}]}"#;
+        let mut parser = RuleParser::new(json);
+        assert_eq!(parser.eval("@json:$.chapters[0].title").unwrap(), "第一章");
+        assert_eq!(parser.eval("@json:$.chapters[1].id").unwrap(), "ch2");
+    }
+
+    #[test]
+    fn test_json_path_wildcard() {
+        let json = r#"{"tags": ["玄幻", "修仙", "热血"]}"#;
+        let mut parser = RuleParser::new(json);
+        let result = parser.eval("@json:$.tags[*]").unwrap();
+        assert!(result.contains("玄幻"));
+        assert!(result.contains("修仙"));
+    }
+
+    #[test]
+    fn test_zhetian_json_parse() {
+        // 读取遮天书籍 JSON 测试数据
+        let json = include_str!("../../tests/fixtures/zhetian_novel_info.json");
+        let mut parser = RuleParser::new(json);
+
+        // 测试基本信息解析
+        assert_eq!(parser.eval("@json:$.novel.id").unwrap(), "zhetian-001");
+        assert_eq!(parser.eval("@json:$.novel.title").unwrap(), "遮天");
+        assert_eq!(parser.eval("@json:$.novel.author").unwrap(), "辰东");
+        assert_eq!(parser.eval("@json:$.novel.status").unwrap(), "已完结");
+        assert_eq!(
+            parser.eval("@json:$.novel.cover").unwrap(),
+            "https://img.example.com/novels/zhetian/cover.jpg"
+        );
+
+        // 测试嵌套结构
+        assert_eq!(parser.eval("@json:$.novel.stats.rating").unwrap(), "9.6");
+
+        // 测试数组
+        let tags_result = parser.eval("@json:$.novel.tags[*]").unwrap();
+        assert!(tags_result.contains("玄幻"));
+        assert!(tags_result.contains("修仙"));
+
+        // 测试章节信息
+        assert_eq!(parser.eval("@json:$.novel.chapters.total").unwrap(), "1880");
+        assert_eq!(
+            parser
+                .eval("@json:$.novel.chapters.volumes[0].title")
+                .unwrap(),
+            "第一卷 九龙拉棺"
+        );
+        assert_eq!(
+            parser
+                .eval("@json:$.novel.chapters.volumes[0].chapter_list[0].title")
+                .unwrap(),
+            "第一章 九龙拉棺"
+        );
     }
 }

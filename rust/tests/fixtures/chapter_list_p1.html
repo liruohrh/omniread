@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <title>Chapter List - Page 1</title>
+</head>
+
+<body>
+    <div class="chapter-list-container" data-book-id="book123" data-page="1">
+        <header class="book-header">
+            <h1 class="book-title">The Great Adventure</h1>
+            <p class="book-author">by Author Name</p>
+        </header>
+
+        <section class="chapters">
+            <h2>Chapter List (Page 1)</h2>
+            <ul class="chapter-list" id="chapter-list">
+                <li class="chapter-item" data-chapter-id="ch001">
+                    <a href="/chapter/ch001" class="chapter-link">
+                        <span class="chapter-num">1</span>
+                        <span class="chapter-title">The Beginning</span>
+                        <span class="chapter-date">2024-01-01</span>
+                    </a>
+                </li>
+                <li class="chapter-item" data-chapter-id="ch002">
+                    <a href="/chapter/ch002" class="chapter-link">
+                        <span class="chapter-num">2</span>
+                        <span class="chapter-title">The Journey Starts</span>
+                        <span class="chapter-date">2024-01-02</span>
+                    </a>
+                </li>
+                <li class="chapter-item" data-chapter-id="ch003">
+                    <a href="/chapter/ch003" class="chapter-link">
+                        <span class="chapter-num">3</span>
+                        <span class="chapter-title">First Challenge</span>
+                        <span class="chapter-date">2024-01-03</span>
+                    </a>
+                </li>
+            </ul>
+        </section>
+
+        <nav class="pagination">
+            <a href="#" class="page-prev disabled">Previous</a>
+            <span class="page-info">Page 1 of 2</span>
+            <a href="/book/book123/chapters?page=2" class="page-next">Next</a>
+        </nav>
+    </div>
+</body>
+
+</html>

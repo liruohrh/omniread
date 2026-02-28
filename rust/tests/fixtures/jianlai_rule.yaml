@@ -1,0 +1,25 @@
+id: jianlai-anime
+name: 剑来动漫
+base_url: https://example.com
+content_type: anime
+
+book_detail:
+  title: ["@css:.anime-title"]
+  author: ["@css:.original-author a"]
+  cover: ["@css:.cover-img@data-src"]
+  description: ["@css:.description-text"]
+  status: ["@css:.status"]
+  tags: ["@js:(function() { let tags = $$('.genre-tag'); let result = []; for(let i=0; i<tags.length; i++) { result.push(text(tags[i])); } return result; })()"]
+
+chapter_list:
+  list: [".episode-item"]
+  id: ["@css:.episode-item@data-episode-id"]
+  title: ["@css:.episode-name"]
+  url_pattern: ["@css:.episode-link@href"]
+  date: ["@js:(function() { return $('.release-date').text(); })()"]
+
+content:
+  title: ["@css:.episode-title"]
+  content: ["@js:(function() { let scripts = $$('script'); for(let i=0; i<scripts.length; i++) { let type = attr(scripts[i], 'type'); if(type && type === 'application/json') { let videoData = JSON.parse(text(scripts[i])); return JSON.stringify(videoData.sources); } } return '[]'; })()"]
+  next_url: ["@css:.nav-next@href"]
+  prev_url: ["@css:.nav-prev:not(.disabled)@href"]

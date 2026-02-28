@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <title>Chapter List - Page 2</title>
+</head>
+
+<body>
+    <div class="chapter-list-container" data-book-id="book123" data-page="2">
+        <header class="book-header">
+            <h1 class="book-title">The Great Adventure</h1>
+            <p class="book-author">by Author Name</p>
+        </header>
+
+        <section class="chapters">
+            <h2>Chapter List (Page 2)</h2>
+            <ul class="chapter-list" id="chapter-list">
+                <li class="chapter-item" data-chapter-id="ch004">
+                    <a href="/chapter/ch004" class="chapter-link">
+                        <span class="chapter-num">4</span>
+                        <span class="chapter-title">New Friends</span>
+                        <span class="chapter-date">2024-01-04</span>
+                    </a>
+                </li>
+                <li class="chapter-item" data-chapter-id="ch005">
+                    <a href="/chapter/ch005" class="chapter-link">
+                        <span class="chapter-num">5</span>
+                        <span class="chapter-title">The Final Battle</span>
+                        <span class="chapter-date">2024-01-05</span>
+                    </a>
+                </li>
+            </ul>
+        </section>
+
+        <nav class="pagination">
+            <a href="/book/book123/chapters?page=1" class="page-prev">Previous</a>
+            <span class="page-info">Page 2 of 2</span>
+            <a href="#" class="page-next disabled">Next</a>
+        </nav>
+    </div>
+</body>
+
+</html>
