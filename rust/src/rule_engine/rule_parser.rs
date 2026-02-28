@@ -312,7 +312,7 @@ mod tests {
     #[test]
     fn test_zhetian_json_parse() {
         // 读取遮天书籍 JSON 测试数据
-        let json = include_str!("../../tests/fixtures/zhetian_novel_info.json");
+        let json = include_str!("../../tests/rule/fixtures/novel/zhetian_novel_info.json");
         let mut parser = RuleParser::new(json);
 
         // 测试基本信息解析

@@ -14,21 +14,21 @@ use std::collections::HashMap;
 // ========== 测试资源 ==========
 
 // 刀剑神域（轻小说）
-const SAO_NOVEL_INFO: &str = include_str!("fixtures/sao_novel_info.html");
-const SAO_CHAPTER_CONTENT: &str = include_str!("fixtures/sao_chapter_content.html");
+const SAO_NOVEL_INFO: &str = include_str!("fixtures/light_novel/sao_novel_info.html");
+const SAO_CHAPTER_CONTENT: &str = include_str!("fixtures/light_novel/sao_chapter_content.html");
 
 // 剑来（动漫）
-const JIANLAI_ANIME_PAGE: &str = include_str!("fixtures/jianlai_anime_page.html");
+const JIANLAI_ANIME_PAGE: &str = include_str!("fixtures/anime/jianlai_anime_page.html");
 
 // 一拳超人（漫画）
-const MANGA_INFO: &str = include_str!("fixtures/manga_info.html");
-const MANGA_CHAPTER_SCROLL: &str = include_str!("fixtures/manga_chapter_scroll.html");
+const MANGA_INFO: &str = include_str!("fixtures/comic/opm_info.html");
+const MANGA_CHAPTER_SCROLL: &str = include_str!("fixtures/comic/opm_chapter_scroll.html");
 
 // 遮天（小说，信息+目录同页，分页内容）
-const ZHETIAN_NOVEL_INFO: &str = include_str!("fixtures/zhetian_novel_info.html");
-const ZHETIAN_CHAPTER_P1: &str = include_str!("fixtures/zhetian_chapter_p1.html");
-const ZHETIAN_CHAPTER_P2: &str = include_str!("fixtures/zhetian_chapter_p2.html");
-const ZHETIAN_CHAPTER_P3: &str = include_str!("fixtures/zhetian_chapter_p3.html");
+const ZHETIAN_NOVEL_INFO: &str = include_str!("fixtures/novel/zhetian_novel_info.html");
+const ZHETIAN_CHAPTER_P1: &str = include_str!("fixtures/novel/zhetian_chapter_p1.html");
+const ZHETIAN_CHAPTER_P2: &str = include_str!("fixtures/novel/zhetian_chapter_p2.html");
+const ZHETIAN_CHAPTER_P3: &str = include_str!("fixtures/novel/zhetian_chapter_p3.html");
 
 // ========== 1. 轻小说《刀剑神域》测试 ==========
 

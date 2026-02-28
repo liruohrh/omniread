@@ -22,7 +22,7 @@ fn test_rule_array_execution() {
 #[test]
 fn test_yaml_rule_parsing() {
     // 测试 YAML 格式规则文件的解析
-    let yaml_content = fs::read_to_string("tests/fixtures/zhetian_rule.yaml").unwrap();
+    let yaml_content = fs::read_to_string("fixtures/novel/zhetian_rule.yaml").unwrap();
 
     // 解析 YAML
     let docs = YamlLoader::load_from_str(&yaml_content).unwrap();

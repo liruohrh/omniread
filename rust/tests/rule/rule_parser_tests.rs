@@ -9,8 +9,8 @@ use serde_yaml;
 #[test]
 fn test_zhetian_novel_rule() {
     // 读取测试数据和规则
-    let html = fs::read_to_string("tests/fixtures/zhetian_novel_info.html").unwrap();
-    let yaml_content = fs::read_to_string("tests/fixtures/zhetian_rule.yaml").unwrap();
+    let html = fs::read_to_string("fixtures/novel/zhetian_novel_info.html").unwrap();
+    let yaml_content = fs::read_to_string("fixtures/novel/zhetian_rule.yaml").unwrap();
     let source: Source = serde_yaml::from_str(&yaml_content).unwrap();
 
     let mut parser = RuleParser::new(&html);
@@ -51,8 +51,8 @@ fn test_zhetian_novel_rule() {
 #[test]
 fn test_sao_light_novel_rule() {
     // 读取测试数据和规则
-    let html = fs::read_to_string("tests/fixtures/sao_novel_info.html").unwrap();
-    let yaml_content = fs::read_to_string("tests/fixtures/sao_rule.yaml").unwrap();
+    let html = fs::read_to_string("fixtures/light_novel/sao_novel_info.html").unwrap();
+    let yaml_content = fs::read_to_string("fixtures/light_novel/sao_rule.yaml").unwrap();
     let source: Source = serde_yaml::from_str(&yaml_content).unwrap();
 
     let mut parser = RuleParser::new(&html);
@@ -90,8 +90,8 @@ fn test_sao_light_novel_rule() {
 #[test]
 fn test_jianlai_anime_rule() {
     // 读取测试数据和规则
-    let html = fs::read_to_string("tests/fixtures/jianlai_anime_page.html").unwrap();
-    let yaml_content = fs::read_to_string("tests/fixtures/jianlai_rule.yaml").unwrap();
+    let html = fs::read_to_string("fixtures/anime/jianlai_anime_page.html").unwrap();
+    let yaml_content = fs::read_to_string("fixtures/anime/jianlai_rule.yaml").unwrap();
     let source: Source = serde_yaml::from_str(&yaml_content).unwrap();
 
     let mut parser = RuleParser::new(&html);
@@ -135,8 +135,8 @@ fn test_jianlai_anime_rule() {
 #[test]
 fn test_manga_rule() {
     // 读取测试数据和规则
-    let html = fs::read_to_string("tests/fixtures/manga_info.html").unwrap();
-    let yaml_content = fs::read_to_string("tests/fixtures/manga_rule.yaml").unwrap();
+    let html = fs::read_to_string("fixtures/comic/opm_info.html").unwrap();
+    let yaml_content = fs::read_to_string("fixtures/comic/opm_rule.yaml").unwrap();
     let source: Source = serde_yaml::from_str(&yaml_content).unwrap();
 
     let mut parser = RuleParser::new(&html);
@@ -174,7 +174,7 @@ fn test_manga_rule() {
 #[test]
 fn test_json_rule_parsing() {
     // 读取遮天 JSON 测试数据
-    let json = fs::read_to_string("tests/fixtures/zhetian_novel_info.json").unwrap();
+    let json = fs::read_to_string("fixtures/novel/zhetian_novel_info.json").unwrap();
     let mut parser = RuleParser::new(&json);
 
     // 测试 JSON Path 解析
