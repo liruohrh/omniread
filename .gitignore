@@ -1,3 +1,5 @@
+*.tmp/
+*.tmp.*
 *.vcsig.*
 *_vcsig_*
 *.local.*

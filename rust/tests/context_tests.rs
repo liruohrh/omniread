@@ -5,13 +5,13 @@ use rust_lib_omniread::js_engine::{
 };
 use std::collections::HashMap;
 
-const ANIME_SINGLE_PAGE: &str = include_str!("fixtures/anime_single_page.html");
-const PAGINATED_P1: &str = include_str!("fixtures/paginated_content_p1.html");
+const ANIME_SINGLE_PAGE: &str = include_str!("fixtures/context/anime_single_page.html");
+const PAGINATED_P1: &str = include_str!("fixtures/context/paginated_content_p1.html");
 #[allow(dead_code)]
-const PAGINATED_P2: &str = include_str!("fixtures/paginated_content_p2.html");
-const PAGINATED_P3: &str = include_str!("fixtures/paginated_content_p3.html");
-const CHAPTER_LIST_P1: &str = include_str!("fixtures/chapter_list_p1.html");
-const CHAPTER_LIST_P2: &str = include_str!("fixtures/chapter_list_p2.html");
+const PAGINATED_P2: &str = include_str!("fixtures/context/paginated_content_p2.html");
+const PAGINATED_P3: &str = include_str!("fixtures/context/paginated_content_p3.html");
+const CHAPTER_LIST_P1: &str = include_str!("fixtures/context/chapter_list_p1.html");
+const CHAPTER_LIST_P2: &str = include_str!("fixtures/context/chapter_list_p2.html");
 
 // ========== Context Injection Tests ==========
 

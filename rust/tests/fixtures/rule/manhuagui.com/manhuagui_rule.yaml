@@ -1,0 +1,21 @@
+id: manhuagui
+name: 看漫画
+base_url: https://www.manhuagui.com
+content_type: comic
+
+book_detail:
+  title: ["@css:.book-title h1"]
+  author: ["@js:(function() { var links = $$('.detail-list a'); var authors = []; for (var i = 0; i < links.length; i++) { var href = attr(links[i], 'href'); if (href && href.indexOf('/author/') !== -1) { authors.push(text(links[i])); } } return authors.join(', '); })()"]
+  cover: ["@css:.book-cover img@src"]
+  description: ["@css:#intro-cut"]
+  status: ["@css:.detail-list li.status .red"]
+
+chapter_list:
+  list: [".chapter-list li"]
+  id: ["@css:a@href", "@re:/comic/\\d+/(\\d+).html"]
+  title: ["@css:a span"]
+  url_pattern: ["@css:a@href"]
+
+content:
+  title: ["@css:.title h2"]
+  content: ["@js:(function() { return []; })()"]

@@ -3,14 +3,20 @@
 use rust_lib_omniread::js_engine::JsRuntime;
 use std::collections::HashMap;
 
-const TEST_HTML: &str = include_str!("fixtures/test_basic.html");
+const TEST_HTML: &str = include_str!("fixtures/js_api/test_basic.html");
 
 // $ selector tests
 
 #[test]
 fn test_select_by_id() {
     let mut rt = JsRuntime::new();
-    let result = rt.execute(TEST_HTML, r##"let el = $("#container"); el ? el.tagName : null"##, None).unwrap();
+    let result = rt
+        .execute(
+            TEST_HTML,
+            r##"let el = $("#container"); el ? el.tagName : null"##,
+            None,
+        )
+        .unwrap();
     assert!(result.contains("div"));
 }
 
@@ -24,7 +30,9 @@ fn test_select_by_class() {
 #[test]
 fn test_select_not_found() {
     let mut rt = JsRuntime::new();
-    let result = rt.execute(TEST_HTML, r#"$(".nonexistent") === null"#, None).unwrap();
+    let result = rt
+        .execute(TEST_HTML, r#"$(".nonexistent") === null"#, None)
+        .unwrap();
     assert_eq!(result, "true");
 }
 
@@ -33,19 +41,27 @@ fn test_select_not_found() {
 #[test]
 fn test_select_all_multiple() {
     let mut rt = JsRuntime::new();
-    let result = rt.execute(TEST_HTML, r#"$$(".item").length"#, None).unwrap();
+    let result = rt
+        .execute(TEST_HTML, r#"$$(".item").length"#, None)
+        .unwrap();
     assert_eq!(result, "3");
 }
 
 #[test]
 fn test_select_all_iterate() {
     let mut rt = JsRuntime::new();
-    let result = rt.execute(TEST_HTML, r#"
+    let result = rt
+        .execute(
+            TEST_HTML,
+            r#"
         let els = $$(".item");
         let texts = [];
         for (let i = 0; i < els.length; i++) { texts.push(text(els[i])); }
         texts;
-    "#, None).unwrap();
+    "#,
+            None,
+        )
+        .unwrap();
     let arr: Vec<String> = serde_json::from_str(&result).unwrap();
     assert_eq!(arr.len(), 3);
 }
@@ -62,7 +78,9 @@ fn test_text_simple() {
 #[test]
 fn test_text_with_children() {
     let mut rt = JsRuntime::new();
-    let result = rt.execute(TEST_HTML, r##"text($("#list"))"##, None).unwrap();
+    let result = rt
+        .execute(TEST_HTML, r##"text($("#list"))"##, None)
+        .unwrap();
     assert!(result.contains("Item 1"));
 }
 
@@ -71,14 +89,18 @@ fn test_text_with_children() {
 #[test]
 fn test_attr_existing() {
     let mut rt = JsRuntime::new();
-    let result = rt.execute(TEST_HTML, r#"attr($("a"), "href")"#, None).unwrap();
+    let result = rt
+        .execute(TEST_HTML, r#"attr($("a"), "href")"#, None)
+        .unwrap();
     assert!(result.contains("https://example.com"));
 }
 
 #[test]
 fn test_attr_data() {
     let mut rt = JsRuntime::new();
-    let result = rt.execute(TEST_HTML, r##"attr($("#container"), "data-id")"##, None).unwrap();
+    let result = rt
+        .execute(TEST_HTML, r##"attr($("#container"), "data-id")"##, None)
+        .unwrap();
     assert!(result.contains("123"));
 }
 
@@ -87,14 +109,18 @@ fn test_attr_data() {
 #[test]
 fn test_has_class_true() {
     let mut rt = JsRuntime::new();
-    let result = rt.execute(TEST_HTML, r#"hasClass($("h1"), "title")"#, None).unwrap();
+    let result = rt
+        .execute(TEST_HTML, r#"hasClass($("h1"), "title")"#, None)
+        .unwrap();
     assert_eq!(result, "true");
 }
 
 #[test]
 fn test_has_class_false() {
     let mut rt = JsRuntime::new();
-    let result = rt.execute(TEST_HTML, r#"hasClass($("h1"), "nonexistent")"#, None).unwrap();
+    let result = rt
+        .execute(TEST_HTML, r#"hasClass($("h1"), "nonexistent")"#, None)
+        .unwrap();
     assert_eq!(result, "false");
 }
 
@@ -103,7 +129,9 @@ fn test_has_class_false() {
 #[test]
 fn test_html_simple() {
     let mut rt = JsRuntime::new();
-    let result = rt.execute(TEST_HTML, r#"html($(".nested"))"#, None).unwrap();
+    let result = rt
+        .execute(TEST_HTML, r#"html($(".nested"))"#, None)
+        .unwrap();
     assert!(result.contains("<span"));
 }
 
@@ -112,14 +140,18 @@ fn test_html_simple() {
 #[test]
 fn test_nested_select() {
     let mut rt = JsRuntime::new();
-    let result = rt.execute(TEST_HTML, r##"text($($("#container"), "h1"))"##, None).unwrap();
+    let result = rt
+        .execute(TEST_HTML, r##"text($($("#container"), "h1"))"##, None)
+        .unwrap();
     assert!(result.contains("Hello World"));
 }
 
 #[test]
 fn test_nested_select_all() {
     let mut rt = JsRuntime::new();
-    let result = rt.execute(TEST_HTML, r##"$$($("#list"), ".item").length"##, None).unwrap();
+    let result = rt
+        .execute(TEST_HTML, r##"$$($("#list"), ".item").length"##, None)
+        .unwrap();
     assert_eq!(result, "3");
 }
 
@@ -128,14 +160,18 @@ fn test_nested_select_all() {
 #[test]
 fn test_base64() {
     let mut rt = JsRuntime::new();
-    let result = rt.execute("", r#"base64Decode(base64Encode("hello"))"#, None).unwrap();
+    let result = rt
+        .execute("", r#"base64Decode(base64Encode("hello"))"#, None)
+        .unwrap();
     assert!(result.contains("hello"));
 }
 
 #[test]
 fn test_hex() {
     let mut rt = JsRuntime::new();
-    let result = rt.execute("", r#"hexDecode(hexEncode("test"))"#, None).unwrap();
+    let result = rt
+        .execute("", r#"hexDecode(hexEncode("test"))"#, None)
+        .unwrap();
     assert!(result.contains("test"));
 }
 
@@ -171,7 +207,9 @@ fn test_vars() {
 #[test]
 fn test_set_html() {
     let mut rt = JsRuntime::new();
-    let result = rt.execute("", r#"setHtml("<p>Dynamic</p>"); text($("p"))"#, None).unwrap();
+    let result = rt
+        .execute("", r#"setHtml("<p>Dynamic</p>"); text($("p"))"#, None)
+        .unwrap();
     assert!(result.contains("Dynamic"));
 }
 

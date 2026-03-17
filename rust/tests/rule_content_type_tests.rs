@@ -6,6 +6,8 @@
 //! 3. 漫画《一拳超人》- 下拉式阅读
 //! 4. 小说《遮天》- 信息+目录同页，多页内容
 
+mod helpers;
+
 use rust_lib_omniread::js_engine::{
     BookContext, JsRuntime, ParseContext, ParseMode, SourceContext,
 };
@@ -14,21 +16,22 @@ use std::collections::HashMap;
 // ========== 测试资源 ==========
 
 // 刀剑神域（轻小说）
-const SAO_NOVEL_INFO: &str = include_str!("fixtures/light_novel/sao_novel_info.html");
-const SAO_CHAPTER_CONTENT: &str = include_str!("fixtures/light_novel/sao_chapter_content.html");
+const SAO_NOVEL_INFO: &str = include_str!("fixtures/rule/light_novel/sao_novel_info.html");
+const SAO_CHAPTER_CONTENT: &str =
+    include_str!("fixtures/rule/light_novel/sao_chapter_content.html");
 
 // 剑来（动漫）
-const JIANLAI_ANIME_PAGE: &str = include_str!("fixtures/anime/jianlai_anime_page.html");
+const JIANLAI_ANIME_PAGE: &str = include_str!("fixtures/rule/anime/jianlai_anime_page.html");
 
 // 一拳超人（漫画）
-const MANGA_INFO: &str = include_str!("fixtures/comic/opm_info.html");
-const MANGA_CHAPTER_SCROLL: &str = include_str!("fixtures/comic/opm_chapter_scroll.html");
+const MANGA_INFO: &str = include_str!("fixtures/rule/comic/opm_info.html");
+const MANGA_CHAPTER_SCROLL: &str = include_str!("fixtures/rule/comic/opm_chapter_scroll.html");
 
 // 遮天（小说，信息+目录同页，分页内容）
-const ZHETIAN_NOVEL_INFO: &str = include_str!("fixtures/novel/zhetian_novel_info.html");
-const ZHETIAN_CHAPTER_P1: &str = include_str!("fixtures/novel/zhetian_chapter_p1.html");
-const ZHETIAN_CHAPTER_P2: &str = include_str!("fixtures/novel/zhetian_chapter_p2.html");
-const ZHETIAN_CHAPTER_P3: &str = include_str!("fixtures/novel/zhetian_chapter_p3.html");
+const ZHETIAN_NOVEL_INFO: &str = include_str!("fixtures/rule/novel/zhetian_novel_info.html");
+const ZHETIAN_CHAPTER_P1: &str = include_str!("fixtures/rule/novel/zhetian_chapter_p1.html");
+const ZHETIAN_CHAPTER_P2: &str = include_str!("fixtures/rule/novel/zhetian_chapter_p2.html");
+const ZHETIAN_CHAPTER_P3: &str = include_str!("fixtures/rule/novel/zhetian_chapter_p3.html");
 
 // ========== 1. 轻小说《刀剑神域》测试 ==========
 
